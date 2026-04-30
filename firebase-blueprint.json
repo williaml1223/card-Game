@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Base profile for game progress",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "credits": { "type": "number", "description": "Premium currency" },
+        "gold": { "type": "number", "description": "Earned currency" },
+        "materials": { "type": "number", "description": "Upgrade materials" },
+        "arenaScrolls": { "type": "number" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "rank": { "type": "string" },
+        "points": { "type": "number" },
+        "isGuest": { "type": "boolean" },
+        "guildId": { "type": "string" }
+      },
+      "required": ["displayName", "credits", "gold", "materials", "arenaScrolls", "level", "xp", "rank", "points"]
+    },
+    "OwnedCard": {
+      "title": "Owned Card",
+      "description": "Specific instance of a card owned by a user",
+      "type": "object",
+      "properties": {
+        "cardId": { "type": "string" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["cardId", "level", "xp", "ownerId"]
+    },
+    "Guild": {
+      "title": "Guild",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "memberCount": { "type": "number" },
+        "leaderId": { "type": "string" }
+      },
+      "required": ["id", "name", "description", "memberCount", "leaderId"]
+    },
+    "Mission": {
+      "title": "Mission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "rewardType": { "type": "string" },
+        "rewardAmount": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "title", "description", "rewardType", "rewardAmount", "completed", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/users/{userId}/cards/{cardId}": {
+      "schema": "OwnedCard",
+      "description": "Collection of cards owned by the user"
+    },
+    "/guilds/{guildId}": {
+      "schema": "Guild",
+      "description": "Global guilds"
+    },
+    "/users/{userId}/missions/{missionId}": {
+      "schema": "Mission",
+      "description": "User specific missions"
+    }
+  }
+}

@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-nexus-blue: #00f2ff;
+  --color-nexus-red: #ff0055;
+  --color-nexus-purple: #a855f7;
+}
+
+@layer base {
+  body {
+    @apply bg-[#030303] text-zinc-100 selection:bg-blue-500/30 font-sans antialiased overflow-hidden select-none touch-none;
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  }
+}
+
+@layer utilities {
+  .perspective-2000 {
+    perspective: 2000px;
+  }
+
+  .board-3d-container {
+    @apply relative transition-transform duration-1000 ease-out;
+    transform-style: preserve-3d;
+  }
+
+  .board-3d {
+    transform: rotateX(50deg) rotateZ(-12deg) translateY(-20px);
+    transform-style: preserve-3d;
+  }
+
+  .unit-3d-wrapper {
+    transform-style: preserve-3d;
+  }
+
+  .unit-3d {
+    transform: rotateX(-50deg) rotateY(12deg) translateZ(20px);
+    transform-style: preserve-3d;
+  }
+
+  .neon-glow-blue {
+    box-shadow: 0 0 15px rgba(0, 242, 255, 0.4), 0 0 5px rgba(0, 242, 255, 0.2);
+  }
+  
+  .neon-glow-red {
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.4), 0 0 5px rgba(255, 0, 85, 0.2);
+  }
+
+  .neon-glow-purple {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 5px rgba(168, 85, 247, 0.2);
+  }
+
+  .glass-card {
+    @apply bg-black/40 border border-white/10 backdrop-blur-2xl;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+  }
+
+  .damage-shiver {
+    animation: shiver 0.2s ease-in-out infinite;
+  }
+
+  @keyframes shiver {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+  }
+
+  .neural-grid {
+    background-image: 
+      linear-gradient(to right, rgba(0, 242, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 242, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .scanline {
+    width: 100%;
+    height: 100px;
+    z-index: 100;
+    background: linear-gradient(0deg, 
+      rgba(0, 0, 0, 0) 0%, 
+      rgba(0, 242, 255, 0.02) 50%, 
+      rgba(0, 0, 0, 0) 100%);
+    opacity: 0.2;
+    position: absolute;
+    bottom: 100%;
+    animation: scanline 8s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes scanline {
+    0% { bottom: 100%; }
+    80% { bottom: 100%; }
+    100% { bottom: -10%; }
+  }
+}
