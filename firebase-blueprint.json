@@ -5,7 +5,9 @@
       "description": "Base profile for game progress",
       "type": "object",
       "properties": {
+        "uid": { "type": "string" },
         "displayName": { "type": "string" },
+        "friendId": { "type": "string" },
         "credits": { "type": "number", "description": "Premium currency" },
         "gold": { "type": "number", "description": "Earned currency" },
         "materials": { "type": "number", "description": "Upgrade materials" },
@@ -14,10 +16,18 @@
         "xp": { "type": "number" },
         "rank": { "type": "string" },
         "points": { "type": "number" },
+        "elo": { "type": "number" },
         "isGuest": { "type": "boolean" },
-        "guildId": { "type": "string" }
+        "isAdmin": { "type": "boolean" },
+        "guildId": { "type": "string" },
+        "battlePassLevel": { "type": "number" },
+        "battlePassXp": { "type": "number" },
+        "claimedRewards": { "type": "array" },
+        "avatarUrl": { "type": "string" },
+        "ownedIcons": { "type": "array" },
+        "storeIcons": { "type": "array" }
       },
-      "required": ["displayName", "credits", "gold", "materials", "arenaScrolls", "level", "xp", "rank", "points"]
+      "required": ["uid", "displayName", "credits", "gold", "materials", "arenaScrolls", "level", "xp", "rank", "points", "battlePassLevel", "battlePassXp", "claimedRewards"]
     },
     "OwnedCard": {
       "title": "Owned Card",
@@ -27,9 +37,13 @@
         "cardId": { "type": "string" },
         "level": { "type": "number" },
         "xp": { "type": "number" },
-        "ownerId": { "type": "string" }
+        "ownerId": { "type": "string" },
+        "activeSkinId": { "type": "string" },
+        "unlockedSkins": { "type": "array" },
+        "borderId": { "type": "string" },
+        "backgroundId": { "type": "string" }
       },
-      "required": ["cardId", "level", "xp", "ownerId"]
+      "required": ["cardId", "level", "xp", "ownerId", "unlockedSkins"]
     },
     "Guild": {
       "title": "Guild",

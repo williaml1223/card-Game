@@ -25,19 +25,16 @@ import {
   CircleDollarSign,
   Plus,
   Dna,
-  LogIn
+  LogIn,
+  X
 } from 'lucide-react';
 import { Archetype, Unit, Card, UserProfile, OwnedCardData, Guild, Mission, CardSkin } from './types';
 import { auth, db, signInWithGoogle, signInGuest } from './firebase';
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, updateDoc } from 'firebase/firestore';
+import { CARD_DATA, SKIN_DATA, BOARD_WIDTH, BOARD_HEIGHT, MAX_MANA, STORE_REFRESH_INTERVAL, BORDER_DATA, BACKGROUND_DATA, DEFAULT_ICONS } from './constants';
 
 type ViewMode = 'LOGIN' | 'MENU' | 'BATTLE' | 'GACHA' | 'STORE' | 'COLLECTION' | 'ARENA' | 'GUILDS' | 'MISSIONS' | 'BATTLEPASS';
-
-const SKIN_DATA: CardSkin[] = [
-  { id: 's_nexus_1', name: 'Divine Overseer', image: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=400', rarity: 'LEGENDARY' },
-  { id: 's_stalker_1', name: 'Cyber Rogue', image: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=400', rarity: 'RARE' },
-];
 
 const BATTLEPASS_LEVELS = 50;
 const BATTLEPASS_XP_PER_LEVEL = 1000;
@@ -150,68 +147,259 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
-const BOARD_WIDTH = 8;
-const BOARD_HEIGHT = 6;
-const MAX_MANA = 10;
+const AestheticCustomizationModal = ({ ownedCard, onUpdate, onClose }: { ownedCard: OwnedCardData, onUpdate: (data: Partial<OwnedCardData>) => void, onClose: () => void }) => {
+  const card = CARD_DATA.find(c => c.id === ownedCard.cardId);
+  if (!card) return null;
 
-const CARD_DATA: Card[] = [
-  { 
-    id: 't1', type: 'TANK', name: 'Bulwark Prime', cost: 4, 
-    rarity: 'RARE',
-    description: 'Heavily armored titan built for base defense.', 
-    stats: { hp: 180, damage: 12, range: 1, movement: 1, nexusDamage: 5 },
-    image: "https://images.unsplash.com/photo-1558236714-d1ae45095e26?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "Sector fortified. I am the shield."
-  },
-  { 
-    id: 's1', type: 'SNIPER', name: 'Shadow Stalker', cost: 5, 
-    rarity: 'EPIC',
-    description: 'Long-range precision unit with devastating power.', 
-    stats: { hp: 50, damage: 55, range: 5, movement: 1, nexusDamage: 25 },
-    image: "https://images.unsplash.com/photo-1549490349-8643362247b5?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "Target locked. One shot, one outcome."
-  },
-  { 
-    id: 'h1', type: 'HEALER', name: 'Ethereal Muse', cost: 3, 
-    rarity: 'COMMON',
-    description: 'Restores integrity to both units and the Nexus.', 
-    stats: { hp: 70, damage: 15, range: 2, movement: 2, nexusDamage: 2 },
-    image: "https://images.unsplash.com/photo-1614726365910-63024843b355?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "Restoring essence. Breathe again."
-  },
-  { 
-    id: 'r1', type: 'HORDE', name: 'Void Scourge', cost: 2, 
-    rarity: 'COMMON',
-    description: 'Rapid deployment swarm for flanking maneuvers.', 
-    stats: { hp: 40, damage: 18, range: 1, movement: 3, nexusDamage: 12 },
-    image: "https://images.unsplash.com/photo-1581093458791-9f3c3250bb8b?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "We are many. We are the void."
-  },
-  { 
-    id: 'm1', type: 'MAGE', name: 'Arcane Spire', cost: 6, 
-    rarity: 'LEGENDARY',
-    description: 'Deploys area-of-effect suppression fields.', 
-    stats: { hp: 100, damage: 35, range: 2, movement: 1, nexusDamage: 15 },
-    image: "https://images.unsplash.com/photo-1605142859862-978be7eba909?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "Power channeled. Reality is mine to bend."
-  },
-  { 
-    id: 'x1', type: 'TANK', name: 'Nexus God', cost: 9, 
-    rarity: 'MYTHIC',
-    description: 'A divine machine from the core simulation.', 
-    stats: { hp: 500, damage: 80, range: 2, movement: 1, nexusDamage: 50 },
-    image: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "I am the simulation. I am the end."
-  },
-  { 
-    id: 'u1', type: 'SNIPER', name: 'Void Eye', cost: 7, 
-    rarity: 'MYTHIC',
-    description: 'Erases data packets across universal grids.', 
-    stats: { hp: 120, damage: 150, range: 6, movement: 1, nexusDamage: 40 },
-    image: "https://images.unsplash.com/photo-1635332829019-1bd3c0420786?auto=format&fit=crop&q=80&w=400",
-    voiceLine: "Gaze into the abyss. It blinks first."
-  }
-];
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="glass-card max-w-4xl w-full rounded-[3rem] overflow-hidden border-white/10 flex flex-col md:flex-row max-h-[90vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-full md:w-2/5 p-8 border-r border-white/5 bg-black/40 flex flex-col items-center justify-center gap-6">
+           <div className={`relative w-64 aspect-[3/4] rounded-3xl overflow-hidden border-4 ${BORDER_DATA.find(b => b.id === ownedCard.borderId)?.style || 'border-white/10'} ${BACKGROUND_DATA.find(bg => bg.id === ownedCard.backgroundId)?.style || 'bg-neutral-900'} transition-all`}>
+              <img src={SKIN_DATA.find(s => s.id === ownedCard.activeSkinId)?.image || card.image} className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black to-transparent">
+                 <div className="text-xl font-display font-black italic italic">{card.name}</div>
+              </div>
+           </div>
+           <p className="text-[10px] font-black uppercase text-nexus-blue tracking-tighter">Real-time Preview</p>
+        </div>
+
+        <div className="flex-1 p-8 overflow-y-auto space-y-8 scrollbar-hide">
+          <div className="flex justify-between items-center mb-4">
+             <h2 className="text-3xl font-display font-black tracking-tight italic italic underline decoration-nexus-blue underline-offset-8">AESTHETIC UPGRADE</h2>
+             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={24} /></button>
+          </div>
+
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4 px-2 italic italic">Unit Skins</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+               <button 
+                onClick={() => onUpdate({ activeSkinId: null })}
+                className={`p-3 rounded-2xl border transition-all text-left ${!ownedCard.activeSkinId ? 'border-nexus-blue bg-nexus-blue/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}
+              >
+                <div className="text-xs font-black uppercase tracking-widest">Base Skin</div>
+              </button>
+              {SKIN_DATA.filter(s => s.id.includes(card.id.substring(0, 2))).map(skin => (
+                <button 
+                  key={skin.id}
+                  onClick={() => onUpdate({ activeSkinId: skin.id })}
+                  className={`p-3 rounded-2xl border transition-all text-left ${ownedCard.activeSkinId === skin.id ? 'border-nexus-blue bg-nexus-blue/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}
+                >
+                  <div className="text-xs font-black uppercase tracking-widest">{skin.name}</div>
+                  <div className="text-[10px] text-zinc-500 mt-1 uppercase">{skin.rarity}</div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4 px-2 italic italic">Neural Borders</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+              {BORDER_DATA.map(border => (
+                <button 
+                  key={border.id}
+                  onClick={() => onUpdate({ borderId: border.id })}
+                  className={`p-3 rounded-2xl border transition-all text-left ${ownedCard.borderId === border.id ? 'border-nexus-blue bg-nexus-blue/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}
+                >
+                  <div className="text-xs font-black uppercase tracking-widest">{border.name}</div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4 px-2 italic italic">Combat Backgrounds</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+              {BACKGROUND_DATA.map(bg => (
+                <button 
+                  key={bg.id}
+                  onClick={() => onUpdate({ backgroundId: bg.id })}
+                  className={`p-3 rounded-2xl border transition-all text-left ${ownedCard.backgroundId === bg.id ? 'border-nexus-blue bg-nexus-blue/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}
+                >
+                  <div className="text-xs font-black uppercase tracking-widest">{bg.name}</div>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const AvatarSelectionModal = ({ ownedIcons, ownedCards, onSelect, onClose }: { ownedIcons: string[], ownedCards: OwnedCardData[], onSelect: (url: string) => void, onClose: () => void }) => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="glass-card max-w-2xl w-full rounded-[2rem] overflow-hidden border-white/10 flex flex-col max-h-[80vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-8 border-b border-white/5 flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-display font-black tracking-tight italic italic">UPLINK IDENTITY</h2>
+            <p className="text-xs text-nexus-blue font-bold tracking-widest uppercase mt-1">Select your neural representation</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-8 overflow-y-auto space-y-8 scrollbar-hide">
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4 px-2">Neural Symbols (Icons)</h3>
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-4">
+              {ownedIcons.map((url, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => { onSelect(url); onClose(); }}
+                  className="aspect-square rounded-2xl overflow-hidden border-2 border-white/5 hover:border-nexus-blue transition-all group relative"
+                >
+                  <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                  <div className="absolute inset-0 bg-nexus-blue/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-4 px-2">Unit Signatures (Cards)</h3>
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-4">
+              {ownedCards.map((oc, i) => {
+                const card = CARD_DATA.find(c => c.id === oc.cardId);
+                if (!card) return null;
+                return (
+                  <button 
+                    key={i} 
+                    onClick={() => { if(card.image) { onSelect(card.image); onClose(); } }}
+                    className="aspect-square rounded-2xl overflow-hidden border-2 border-white/5 hover:border-nexus-blue transition-all group relative"
+                  >
+                    <img src={card.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                    <div className="absolute inset-0 bg-nexus-blue/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const CardDetailModal = ({ card, onClose, onPlay }: { card: Card, onClose: () => void, onPlay?: () => void }) => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl transition-all"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.9, rotateY: -30, opacity: 0 }}
+        animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+        exit={{ scale: 0.8, rotateY: 30, opacity: 0 }}
+        className="relative max-w-4xl w-full bg-neutral-900 rounded-[1.5rem] overflow-hidden border-[6px] border-black shadow-[15px_15px_0_rgba(0,0,0,0.5)] flex flex-col md:flex-row"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Halftone Overlay */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_#fff_1px,_transparent_1px)] bg-[length:4px_4px]" />
+        
+        <div className="w-full md:w-1/2 h-80 md:h-auto relative border-b-4 md:border-b-0 md:border-r-4 border-black">
+          <img src={card.image} className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
+          
+          <div className="absolute top-6 left-6 -rotate-6">
+            <div className={`px-4 py-2 bg-yellow-400 text-black font-black uppercase text-[12px] border-2 border-black shadow-[4px_4px_0_#000] tracking-widest`}>
+               {card.rarity} {card.type}
+            </div>
+          </div>
+
+          <div className="absolute bottom-6 left-6 right-6">
+             <div className="p-4 bg-white text-black border-4 border-black shadow-[8px_8px_0_#000] -rotate-1">
+                <div className="text-[10px] font-black uppercase tracking-tighter opacity-50 mb-1">Transmission Log</div>
+                <div className="text-sm font-black italic tracking-tight leading-tight">"{card.voiceLine}"</div>
+             </div>
+          </div>
+        </div>
+        
+        <div className="flex-1 p-8 md:p-12 flex flex-col justify-between gap-10 bg-neutral-800 relative">
+          <div className="absolute top-0 right-0 p-8">
+             <div className="w-16 h-16 rounded-full bg-nexus-blue border-4 border-black shadow-[6px_6px_0_#000] flex flex-col items-center justify-center text-black">
+                <Zap size={20} className="fill-current" />
+                <span className="text-lg font-black leading-none">{card.cost}</span>
+             </div>
+          </div>
+
+          <div>
+            <h2 className="text-6xl font-black tracking-tighter uppercase mb-6 italic text-white drop-shadow-[4px_4px_0_theme(colors.black)]">
+              {card.name}
+            </h2>
+            
+            <p className="text-zinc-400 text-sm leading-relaxed mb-8 font-medium">
+              {card.description}
+            </p>
+            
+            <div className="grid grid-cols-2 gap-6">
+              {[
+                { label: 'Integrity', val: card.stats.hp, icon: Activity, color: 'text-green-400' },
+                { label: 'Output', val: card.stats.damage, icon: Sword, color: 'text-rose-400' },
+                { label: 'Radius', val: card.stats.range, icon: Target, color: 'text-blue-400' },
+                { label: 'Velocity', val: card.stats.movement, icon: ArrowRight, color: 'text-amber-400' }
+              ].map(stat => (
+                <div key={stat.label} className="group flex items-center gap-4 p-4 bg-black/40 border-4 border-black shadow-[6px_6px_0_rgba(0,0,0,0.3)] hover:-translate-y-1 transition-transform">
+                  <stat.icon className={`${stat.color} shrink-0`} size={24} />
+                  <div>
+                    <div className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">{stat.label}</div>
+                    <div className="text-2xl font-black text-white">{stat.val}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-6">
+            <button 
+              onClick={onClose}
+              className="px-8 py-5 border-4 border-black bg-neutral-700 text-white font-black uppercase text-[12px] tracking-[0.2em] shadow-[6px_6px_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+            >
+              Abort
+            </button>
+            {onPlay && (
+               <button 
+                onClick={() => { onPlay(); onClose(); }}
+                className="flex-1 py-5 border-4 border-black bg-nexus-blue text-black font-black uppercase text-[12px] tracking-[0.3em] shadow-[8px_8px_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+              >
+                Execute Deployment
+              </button>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
 
 const playPlacementSound = () => {
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -263,20 +451,34 @@ const speakLine = (line: string, type: Archetype) => {
   window.speechSynthesis.speak(utterance);
 };
 
-const MenuCard = ({ icon, title, desc, onClick, color }: { icon: React.ReactNode, title: string, desc: string, onClick: () => void, color: string }) => (
-  <motion.div 
-    whileHover={{ scale: 1.02, y: -5 }}
-    whileTap={{ scale: 0.98 }}
-    onClick={onClick}
-    className={`glass-card p-6 rounded-3xl border border-white/5 cursor-pointer hover:border-${color}-500 group transition-all`}
-  >
-    <div className={`p-3 bg-${color}-500/10 rounded-2xl w-fit mb-4 text-${color}-400 group-hover:scale-110 transition-transform`}>
-      {icon}
-    </div>
-    <h3 className="text-xl font-serif italic mb-1">{title}</h3>
-    <p className="text-[10px] text-neutral-500 uppercase tracking-widest leading-loose">{desc}</p>
-  </motion.div>
-);
+const MenuCard = ({ icon, title, desc, onClick, color }: { icon: React.ReactNode, title: string, desc: string, onClick: () => void, color: string }) => {
+  const colorMap: Record<string, string> = {
+    blue: 'border-nexus-blue/30 text-nexus-blue bg-nexus-blue/10 hover:shadow-[0_0_20px_rgba(0,210,255,0.2)]',
+    rose: 'border-rose-500/30 text-rose-400 bg-rose-500/10 hover:shadow-[0_0_20px_rgba(244,63,94,0.2)]',
+    indigo: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]',
+    cyan: 'border-cyan-400/30 text-cyan-400 bg-cyan-400/10 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]',
+    emerald: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]',
+    amber: 'border-amber-500/30 text-amber-400 bg-amber-500/10 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]',
+  };
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.02, y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className={`relative group flex flex-col p-8 rounded-[2.5rem] border backdrop-blur-xl transition-all duration-500 ${colorMap[color] || colorMap.blue} text-left`}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+      <div className="relative z-10">
+        <div className="p-4 bg-black/40 rounded-2xl w-fit mb-8 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+           {React.cloneElement(icon as React.ReactElement, { size: 28 })}
+        </div>
+        <h3 className="text-2xl font-black tracking-tight text-white mb-2 uppercase italic">{title}</h3>
+        <p className="text-[10px] text-white/40 group-hover:text-white/70 transition-colors uppercase tracking-[0.3em] font-mono leading-relaxed">{desc}</p>
+      </div>
+    </motion.button>
+  );
+};
 
 const getArchetypeIcon = (type: Archetype) => {
   switch (type) {
@@ -285,20 +487,57 @@ const getArchetypeIcon = (type: Archetype) => {
     case 'HEALER': return <Heart size={16} />;
     case 'HORDE': return <Users size={16} />;
     case 'MAGE': return <Zap size={16} />;
+    case 'STRIKER': return <Sword size={16} />;
   }
 };
 
 const RarityGlow = {
-  COMMON: 'shadow-[0_0_20px_rgba(255,255,255,0.1)] border-white/20',
-  RARE: 'shadow-[0_0_20px_rgba(59,130,246,0.3)] border-blue-500/50',
-  EPIC: 'shadow-[0_0_20px_rgba(168,85,247,0.3)] border-purple-500/50',
-  LEGENDARY: 'shadow-[0_0_30px_rgba(234,179,8,0.4)] border-amber-500/50',
-  MYTHIC: 'shadow-[0_0_40px_rgba(244,63,94,0.5)] border-rose-500/50',
+  COMMON: 'shadow-[inset_0_0_15px_rgba(255,255,255,0.05)] border-white/10',
+  RARE: 'shadow-[0_0_20px_rgba(59,130,246,0.2),inset_0_0_10px_rgba(59,130,246,0.1)] border-blue-500/40',
+  EPIC: 'shadow-[0_0_25px_rgba(168,85,247,0.3),inset_0_0_12px_rgba(168,85,247,0.2)] border-purple-500/40',
+  LEGENDARY: 'shadow-[0_0_35px_rgba(234,179,8,0.4),inset_0_0_15px_rgba(234,179,8,0.3)] border-amber-400 ring-2 ring-amber-400/20',
+  MYTHIC: 'shadow-[0_0_50px_rgba(244,63,94,0.6),inset_0_0_20px_rgba(244,63,94,0.4)] border-rose-500 ring-4 ring-rose-500/30 animate-pulse',
 };
 
-const MissionArea = ({ missions, onComplete }: { missions: Mission[], onComplete: (id: string) => void }) => {
+const playRaritySound = (rarity: Card['rarity']) => {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    if (rarity === 'MYTHIC') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(110, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.6);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.0);
+      osc.start();
+      osc.stop(ctx.currentTime + 2.0);
+    } else if (rarity === 'LEGENDARY') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+      osc.start();
+      osc.stop(ctx.currentTime + 1.2);
+    }
+  } catch (e) {
+    console.warn("Audio Context failed", e);
+  }
+};
+
+const MissionArea = ({ missions, onComplete, onBack }: { missions: Mission[], onComplete: (id: string) => void, onBack: () => void }) => {
   return (
-    <div className="flex-1 flex flex-col items-center p-6 gap-12 overflow-y-auto custom-scrollbar pb-24">
+    <div className="flex-1 flex flex-col items-center p-6 gap-12 overflow-y-auto custom-scrollbar pb-24 relative">
+       <div className="absolute top-8 left-8">
+          <button onClick={onBack} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+            <Home size={20} />
+          </button>
+       </div>
       <div className="text-center">
          <h2 className="text-5xl font-serif italic mb-2 tracking-tighter">Command Directives</h2>
          <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Execute protocols to secure resources</p>
@@ -336,14 +575,19 @@ const MissionArea = ({ missions, onComplete }: { missions: Mission[], onComplete
   );
 };
 
-const GuildArea = ({ guilds, profile, onJoin, onCreate }: { guilds: Guild[], profile: UserProfile, onJoin: (id: string) => void, onCreate: (name: string) => void }) => {
+const GuildArea = ({ guilds, profile, onJoin, onCreate, onBack }: { guilds: Guild[], profile: UserProfile, onJoin: (id: string) => void, onCreate: (name: string) => void, onBack: () => void }) => {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
 
   const myGuild = guilds.find(g => g.id === profile.guildId);
 
   return (
-    <div className="flex-1 flex flex-col items-center p-6 gap-12 overflow-y-auto custom-scrollbar pb-24">
+    <div className="flex-1 flex flex-col items-center p-6 gap-12 overflow-y-auto custom-scrollbar pb-24 relative">
+      <div className="absolute top-8 left-8">
+        <button onClick={onBack} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+          <Home size={20} />
+        </button>
+      </div>
       <div className="text-center">
          <h2 className="text-5xl font-serif italic mb-2 tracking-tighter">Tactical Guilds</h2>
          <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Collective intelligence networks</p>
@@ -434,7 +678,7 @@ const GuildArea = ({ guilds, profile, onJoin, onCreate }: { guilds: Guild[], pro
 };
 
 // Update GachaArea to include results animation
-const GachaArea = ({ credits, arenaScrolls, onOpen }: { credits: number, arenaScrolls: number, onOpen: (count: number, isScroll?: boolean) => Promise<Card[] | undefined> }) => {
+const GachaArea = ({ credits, arenaScrolls, onOpen, onDetail, onBack }: { credits: number, arenaScrolls: number, onOpen: (count: number, isScroll?: boolean) => Promise<Card[] | undefined>, onDetail: (card: Card) => void, onBack: () => void }) => {
   const [opening, setOpening] = useState(false);
   const [results, setResults] = useState<Card[] | null>(null);
 
@@ -456,6 +700,15 @@ const GachaArea = ({ credits, arenaScrolls, onOpen }: { credits: number, arenaSc
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 gap-8 overflow-y-auto custom-scrollbar relative bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/10 via-neutral-950 to-black">
+      <div className="absolute top-8 left-8 z-20">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 px-6 py-2 rounded-2xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all font-black uppercase text-[10px] tracking-widest"
+        >
+          <Home size={14} />
+          <span>Exit to Nexus</span>
+        </button>
+      </div>
       <AnimatePresence>
         {opening && (
           <motion.div 
@@ -586,7 +839,8 @@ const GachaArea = ({ credits, arenaScrolls, onOpen }: { credits: number, arenaSc
                 initial={{ opacity: 0, scale: 0, rotateY: 90 }}
                 animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                 transition={{ delay: i * 0.1, type: 'spring', damping: 20 }}
-                className={`w-48 aspect-[3/4] relative rounded-3xl overflow-hidden border shadow-2xl group/card ${RarityGlow[card.rarity || 'COMMON']}`}
+                onClick={() => onDetail(card)}
+                className={`w-48 aspect-[3/4] relative rounded-3xl overflow-hidden border shadow-2xl group/card cursor-pointer ${RarityGlow[card.rarity || 'COMMON']}`}
               >
                 <img src={card.image} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-700" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
@@ -617,42 +871,87 @@ const GachaArea = ({ credits, arenaScrolls, onOpen }: { credits: number, arenaSc
   );
 };
 
-const StoreArea = ({ credits, gold, materials, onBuy }: { credits: number, gold: number, materials: number, onBuy: (type: string) => void }) => (
-  <div className="flex-1 flex flex-col items-center justify-start p-6 gap-12 overflow-y-auto custom-scrollbar pb-24">
+const StoreArea = ({ credits, gold, materials, onBuy, storeIcons, onBuyIcon, onBack }: { credits: number, gold: number, materials: number, onBuy: (type: string) => void, storeIcons: any[], onBuyIcon: (icon: any) => void, onBack: () => void }) => (
+  <div className="flex-1 flex flex-col items-center justify-start p-6 gap-12 overflow-y-auto custom-scrollbar pb-32 relative">
+    <div className="absolute top-8 left-8">
+      <button onClick={onBack} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+        <Home size={20} />
+      </button>
+    </div>
     <div className="text-center">
-       <h2 className="text-5xl font-serif italic mb-2 tracking-tighter">Nano-Alloy Foundry</h2>
-       <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Exchange sector resources for tactical enhancement</p>
+       <h2 className="text-5xl font-display font-black italic tracking-tighter italic italic underline decoration-nexus-blue underline-offset-8 mb-4">Nano-Alloy Foundry</h2>
+       <p className="text-[10px] text-neutral-500 uppercase tracking-[0.4em] font-black">Tactical Enhancement Sector</p>
     </div>
 
-    <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div className="glass-card p-10 rounded-[3rem] border-white/5 flex flex-col items-center text-center">
-        <div className="p-4 bg-cyan-500/10 rounded-3xl mb-6 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.2)]"><Hammer size={40} /></div>
-        <div className="text-2xl font-bold mb-2">Nano-Alloy Cache</div>
-        <div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-8">Contains 25x Sync Alloys</div>
+    <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="glass-card p-10 rounded-[3rem] border-white/5 flex flex-col items-center text-center group hover:border-nexus-blue/30 transition-all">
+        <div className="p-4 bg-nexus-blue/10 rounded-3xl mb-6 text-nexus-blue shadow-[0_0_20px_rgba(0,242,255,0.2)] group-hover:scale-110 transition-transform"><Hammer size={40} /></div>
+        <div className="text-2xl font-black italic tracking-tighter mb-2 italic italic">Nano-Alloy Cache</div>
+        <div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-8 font-black">Contains 50x Sync Alloys</div>
         <button 
           onClick={() => onBuy('ALLOY')}
-          disabled={credits < 100}
-          className="w-full py-5 rounded-2xl bg-white text-black font-black uppercase text-[10px] tracking-widest hover:bg-cyan-500 hover:text-white disabled:bg-neutral-800 disabled:text-neutral-500 transition-all flex items-center justify-center gap-3 shadow-xl"
+          className="w-full py-5 rounded-2xl bg-white text-black font-black uppercase text-[10px] tracking-widest hover:bg-nexus-blue hover:text-white transition-all shadow-xl"
         >
-          <CircleDollarSign size={14} />
-          <span>100 Nano-Credits</span>
+          <span>30 Gold</span>
         </button>
       </div>
 
-      <div className="glass-card p-10 rounded-[3rem] border-white/5 flex flex-col items-center text-center border-amber-500/20">
-        <div className="p-4 bg-amber-500/10 rounded-3xl mb-6 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]"><Coins size={40} /></div>
-        <div className="text-2xl font-bold mb-2">Currency Exchange</div>
-        <div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-8">Convert 1000 Gold to 250 Credits</div>
+      <div className="glass-card p-10 rounded-[3rem] border-white/5 flex flex-col items-center text-center border-amber-500/20 group hover:border-amber-500/50 transition-all">
+        <div className="p-4 bg-amber-500/10 rounded-3xl mb-6 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)] group-hover:scale-110 transition-transform"><CircleDollarSign size={40} /></div>
+        <div className="text-2xl font-black italic tracking-tighter mb-2 italic italic">Credit Infusion</div>
+        <div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-8 font-black">Convert Gold to 1000 Credits</div>
         <button 
           onClick={() => onBuy('CREDITS')}
-          disabled={gold < 1000}
-          className="w-full py-5 rounded-2xl bg-white text-black font-black uppercase text-[10px] tracking-widest hover:bg-amber-500 hover:text-white disabled:bg-neutral-800 disabled:text-neutral-500 transition-all flex items-center justify-center gap-3 shadow-xl"
+          className="w-full py-5 rounded-2xl bg-white text-black font-black uppercase text-[10px] tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-xl"
         >
-          <Coins size={14} />
-          <span>1000 Sector Gold</span>
+          <span>50 Gold</span>
+        </button>
+      </div>
+
+      <div className="glass-card p-10 rounded-[3rem] border-white/5 flex flex-col items-center text-center border-purple-500/20 group hover:border-purple-500/50 transition-all">
+        <div className="p-4 bg-purple-500/10 rounded-3xl mb-6 text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)] group-hover:scale-110 transition-transform"><Dna size={40} /></div>
+        <div className="text-2xl font-black italic tracking-tighter mb-2 italic italic">Neural Package</div>
+        <div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-8 font-black">Contains 5x Neural Scrolls</div>
+        <button 
+          onClick={() => onBuy('SCROLLS')}
+          className="w-full py-5 rounded-2xl bg-white text-black font-black uppercase text-[10px] tracking-widest hover:bg-purple-500 hover:text-white transition-all shadow-xl"
+        >
+          <span>100 Gold</span>
         </button>
       </div>
     </div>
+
+    {storeIcons && storeIcons.length > 0 && (
+      <div className="w-full max-w-5xl">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+           <h3 className="text-3xl font-display font-black tracking-tight italic italic underline decoration-purple-500 underline-offset-8">NEURAL SYMBOLS</h3>
+           <div className="flex items-center gap-2 text-[10px] font-black text-neutral-500 uppercase tracking-widest bg-white/5 px-4 py-2 rounded-full border border-white/5">
+             <RefreshCw size={12} className="animate-spin-slow" />
+             Rotates every 7h
+           </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {storeIcons.map((icon, i) => (
+            <div key={icon.id} className="glass-card p-6 rounded-[2.5rem] border-white/5 flex items-center gap-6 group hover:border-purple-500/30 transition-all">
+               <div className="w-20 h-20 rounded-2xl overflow-hidden border border-white/10 relative">
+                  <img src={icon.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                  <div className="absolute inset-0 bg-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+               </div>
+               <div className="flex-1">
+                  <div className="text-lg font-black italic tracking-tighter mb-2 italic italic">Neural Icon #{i+1}</div>
+                  <button 
+                    onClick={() => onBuyIcon(icon)}
+                    disabled={credits < icon.cost}
+                    className="w-full py-2 bg-nexus-blue/10 border border-nexus-blue/30 rounded-xl text-nexus-blue font-black uppercase text-[9px] tracking-widest hover:bg-nexus-blue hover:text-black disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {icon.cost} Credits
+                  </button>
+               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
   </div>
 );
 const POINTS_THRESHOLDS = [10, 20, 40, 60, 80, 90, 100];
@@ -733,7 +1032,7 @@ const OnlineBattleArea = ({ profile, onCombat }: { profile: UserProfile, onComba
     </div>
   );
 };
-const CollectionArea = ({ ownedCards, materials, onUpgrade }: { ownedCards: OwnedCardData[], materials: number, onUpgrade: (id: string) => void }) => {
+const CollectionArea = ({ ownedCards, materials, onUpgrade, onDetail, onAesthetic, onBack }: { ownedCards: OwnedCardData[], materials: number, onUpgrade: (id: string) => void, onDetail: (card: Card) => void, onAesthetic: (oc: OwnedCardData) => void, onBack: () => void }) => {
   const [filter, setFilter] = useState<'ALL' | Archetype>('ALL');
   const [rarityFilter, setRarityFilter] = useState<'ALL' | 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' | 'MYTHIC'>('ALL');
 
@@ -761,11 +1060,20 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade }: { ownedCards: Owne
   });
 
   return (
-    <div className="flex-1 flex flex-col p-4 sm:p-8 gap-8 overflow-hidden h-full">
+    <div className="flex-1 flex flex-col p-4 sm:p-8 gap-8 overflow-hidden h-full relative">
+      <div className="absolute top-4 left-4 lg:hidden">
+        <button onClick={onBack} className="p-2 bg-white/5 rounded-lg border border-white/10"><Home size={16} /></button>
+      </div>
+
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-4xl font-serif italic mb-1 tracking-tighter">Tactical Repository</h2>
-          <p className="text-[10px] text-neutral-500 uppercase tracking-widest">{ownedCards.length} Units Recovered</p>
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="hidden lg:flex p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+            <Home size={20} />
+          </button>
+          <div>
+            <h2 className="text-4xl font-serif italic mb-1 tracking-tighter">Tactical Repository</h2>
+            <p className="text-[10px] text-neutral-500 uppercase tracking-widest">{ownedCards.length} Units Recovered</p>
+          </div>
         </div>
         
         <div className="flex flex-wrap gap-4">
@@ -791,18 +1099,22 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade }: { ownedCards: Owne
               </button>
             ))}
           </div>
-          <select 
-            value={rarityFilter} 
-            onChange={(e) => setRarityFilter(e.target.value as any)}
-            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[9px] font-black uppercase outline-none focus:border-blue-500 text-white"
-          >
-            <option value="ALL">All Rarities</option>
-            <option value="COMMON">Common</option>
-            <option value="RARE">Rare</option>
-            <option value="EPIC">Epic</option>
-            <option value="LEGENDARY">Legendary</option>
-            <option value="MYTHIC">Mythic</option>
-          </select>
+          <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto">
+            {['ALL', 'COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC'].map(r => (
+              <button 
+                key={r}
+                onClick={() => setRarityFilter(r as any)}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${rarityFilter === r ? (
+                  r === 'MYTHIC' ? 'bg-rose-600 text-white' :
+                  r === 'LEGENDARY' ? 'bg-amber-500 text-black' :
+                  r === 'EPIC' ? 'bg-purple-600 text-white' :
+                  r === 'RARE' ? 'bg-blue-600 text-white' : 'bg-white text-black'
+                ) : 'text-neutral-500 hover:text-white'}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -818,9 +1130,10 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade }: { ownedCards: Owne
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   key={oc.id || `${oc.cardId}-${i}`}
-                  className={`group relative aspect-[3/4] rounded-3xl overflow-hidden border border-white/5 bg-neutral-900 cursor-pointer transition-all ${RarityGlow[card.rarity || 'COMMON']}`}
+                  onClick={() => onDetail(card)}
+                  className={`group relative aspect-[3/4] rounded-3xl overflow-hidden border cursor-pointer transition-all ${BORDER_DATA.find(b => b.id === oc.borderId)?.style || 'border-white/5'} ${BACKGROUND_DATA.find(bg => bg.id === oc.backgroundId)?.style || 'bg-neutral-900'} ${RarityGlow[card.rarity || 'COMMON']}`}
                 >
-                  <img src={card.image} className="absolute inset-0 w-full h-full object-cover brightness-50 group-hover:brightness-75 transition-all" />
+                  <img src={SKIN_DATA.find(s => s.id === oc.activeSkinId)?.image || card.image} className="absolute inset-0 w-full h-full object-cover brightness-50 group-hover:brightness-75 transition-all" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
                   
                   <div className="relative h-full p-4 flex flex-col justify-between">
@@ -846,6 +1159,12 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade }: { ownedCards: Owne
                           <span>Fix (20)</span>
                         </div>
                       </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onAesthetic(oc); }}
+                        className="mt-2 w-full py-2 rounded-xl text-[9px] font-black uppercase transition-all bg-nexus-blue/10 border border-nexus-blue/30 text-nexus-blue hover:bg-nexus-blue hover:text-black"
+                      >
+                        Aesthetics
+                      </button>
                     </div>
                   </div>
                 </motion.div>
@@ -858,13 +1177,18 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade }: { ownedCards: Owne
   );
 };
 
-const BattlePassArea = ({ profile, onClaim }: { profile: UserProfile, onClaim: (level: number) => void }) => {
+const BattlePassArea = ({ profile, onClaim, onBack }: { profile: UserProfile, onClaim: (level: number) => void, onBack: () => void }) => {
   const currentLevel = profile.battlePassLevel || 0;
   const currentXp = profile.battlePassXp || 0;
   const progress = (currentXp / BATTLEPASS_XP_PER_LEVEL) * 100;
 
   return (
-    <div className="flex-1 flex flex-col p-8 overflow-y-auto custom-scrollbar pb-32">
+    <div className="flex-1 flex flex-col p-8 overflow-y-auto custom-scrollbar pb-32 relative">
+       <div className="absolute top-8 left-8">
+          <button onClick={onBack} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+            <Home size={20} />
+          </button>
+       </div>
       <div className="mb-12 text-center">
         <h2 className="text-6xl font-serif italic mb-2 tracking-tighter text-purple-500 italic">Neural Pass</h2>
         <div className="flex items-center justify-center gap-4">
@@ -941,52 +1265,97 @@ const BattlePassArea = ({ profile, onClaim }: { profile: UserProfile, onClaim: (
 };
 
 const StatItem = ({ icon: Icon, value, label, colorClass, textClass }: { icon: any, value: any, label: string, colorClass: string, textClass: string }) => (
-  <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl">
-    <div className={`p-2 rounded-lg bg-opacity-20 ${colorClass} ${textClass}`}>
+  <div className="flex items-center gap-3 group cursor-default">
+    <div className={`p-2 rounded-xl ${colorClass}/10 border border-white/5 text-${textClass.replace('text-', '')} group-hover:scale-110 transition-transform`}>
       <Icon size={14} />
     </div>
-    <div>
-      <div className="text-white text-xs font-black">{value}</div>
-      <div className="text-[8px] font-black uppercase text-neutral-500 tracking-tighter">{label}</div>
+    <div className="flex flex-col">
+      <span className={`text-xs font-black italic tracking-tight ${textClass}`}>{value.toLocaleString()}</span>
+      <span className="text-[7px] font-mono uppercase tracking-[0.2em] text-white/30 -mt-1">{label}</span>
     </div>
   </div>
 );
 
 const TopBar = ({ profile, onLogout }: { profile: UserProfile, onLogout: () => void }) => {
   return (
-    <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/40 backdrop-blur-xl z-50">
-      <div className="flex items-center gap-8">
-        <div className="flex flex-col">
-          <span className="text-sm font-serif italic text-white leading-none">Pilot Grid</span>
-          <span className="text-[8px] font-black uppercase text-blue-500 tracking-[0.3em]">{profile.displayName}</span>
+    <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/40 backdrop-blur-xl z-50 sticky top-0">
+      <div className="flex items-center gap-12">
+        <div className="flex items-center gap-4 group cursor-pointer" onClick={() => window.location.reload()}>
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-nexus-blue to-purple-600 p-[1px] group-hover:rotate-12 transition-transform">
+             <div className="w-full h-full rounded-2xl bg-black flex items-center justify-center text-nexus-blue">
+                <Zap size={20} fill="currentColor" />
+             </div>
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-black italic tracking-tighter leading-none">NEXUS<span className="text-nexus-blue font-serif italic font-normal text-sm">os</span></h1>
+            <span className="text-[8px] font-mono text-white/30 uppercase tracking-[0.3em]">Neural Interface v9.5</span>
+          </div>
         </div>
         
-        <div className="hidden md:flex items-center gap-4">
-          <StatItem icon={CircleDollarSign} value={profile.credits} label="Nano-Credits" colorClass="bg-blue-500" textClass="text-blue-400" />
-          <StatItem icon={Coins} value={profile.gold} label="Sector Gold" colorClass="bg-amber-500" textClass="text-amber-400" />
-          <StatItem icon={Zap} value={profile.materials} label="Sync Alloys" colorClass="bg-purple-500" textClass="text-purple-400" />
-          <StatItem icon={Package} value={profile.arenaScrolls || 0} label="Elite Scrolls" colorClass="bg-rose-500" textClass="text-rose-400" />
+        <div className="hidden lg:flex items-center gap-10">
+          <StatItem icon={CircleDollarSign} value={profile.credits} label="Nano-Credits" colorClass="bg-nexus-blue" textClass="text-nexus-blue" />
+          <StatItem icon={Coins} value={profile.gold} label="Materials" colorClass="bg-amber-500" textClass="text-amber-400" />
+          <StatItem icon={Sparkles} value={profile.xp} label="Pilot Experience" colorClass="bg-purple-500" textClass="text-purple-400" />
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex flex-col items-end">
-           <div className="text-xs font-black text-white">LVL {profile.level}</div>
-           <div className="h-1 w-24 bg-neutral-900 rounded-full mt-1 overflow-hidden">
-              <div className="h-full bg-blue-500" style={{ width: `${(profile.xp % 100)}%` }} />
+      <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4 group cursor-pointer pr-8 border-r border-white/5">
+           <div className="text-right">
+              <div className="text-xs font-black text-white group-hover:text-nexus-blue transition-colors italic uppercase tracking-tighter">{profile.displayName}</div>
+              <div className="h-1 w-24 bg-neutral-900 rounded-full mt-1 overflow-hidden border border-white/5">
+                 <div className="h-full bg-nexus-blue shadow-[0_0_8px_rgba(0,210,255,0.6)]" style={{ width: `${(profile.xp % 100)}%` }} />
+              </div>
+           </div>
+           <div className="relative w-12 h-12 rounded-full p-[1px] bg-gradient-to-tr from-nexus-blue/40 to-transparent">
+              <img src={profile.avatarUrl} className="w-full h-full rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-black border border-nexus-blue/50 flex items-center justify-center text-[10px] font-black italic text-nexus-blue">
+                {profile.level}
+              </div>
            </div>
         </div>
-        <button onClick={onLogout} className="p-3 rounded-2xl bg-white/5 border border-white/10 text-neutral-500 hover:text-rose-500 hover:border-rose-500/30 transition-all">
-          <LogOut size={16} />
+        <button onClick={onLogout} className="p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all">
+          <LogOut size={18} />
         </button>
       </div>
     </div>
   );
 };
 
+const CyberspaceBackground = () => (
+  <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-black">
+    <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
+    <motion.div 
+      animate={{ 
+        backgroundPosition: ['0% 0%', '100% 100%'],
+        opacity: [0.1, 0.3, 0.1]
+      }}
+      transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+      className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-purple-900/20 to-blue-900/40"
+      style={{ backgroundSize: '200% 200%' }}
+    />
+    <div className="absolute inset-0 blur-[100px] opacity-30">
+      <motion.div 
+        animate={{ scale: [1, 1.2, 1], x: [0, 100, 0], y: [0, -100, 0] }}
+        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/30 rounded-full"
+      />
+      <motion.div 
+        animate={{ scale: [1.2, 1, 1.2], x: [0, -100, 0], y: [0, 100, 0] }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/30 rounded-full"
+      />
+    </div>
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,black_100%)]" />
+  </div>
+);
+
 export default function App() {
   const [view, setView] = useState<ViewMode>('LOGIN');
   const [sortOrder, setSortOrder] = useState<'RARITY' | 'LEVEL' | 'NAME'>('RARITY');
+  const [selectedCardDetail, setSelectedCardDetail] = useState<Card | null>(null);
+  const [showAvatarSelection, setShowAvatarSelection] = useState(false);
+  const [selectedCardAesthetics, setSelectedCardAesthetics] = useState<OwnedCardData | null>(null);
 
   const getSortedCards = () => {
     return [...ownedCards].sort((a, b) => {
@@ -1003,12 +1372,17 @@ export default function App() {
     });
   };
 
-  const activateAdminMode = async () => {
-    if (!user) {
-      await signInGuest();
-      return;
-    }
-    const userRef = doc(db, 'users', user.uid);
+  const generateFriendId = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += '-';
+    for (let i = 0; i < 4; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return result;
+  };
+
+  const activateAdminMode = async (targetUid: string) => {
+    const userRef = doc(db, 'users', targetUid);
     try {
       await updateDoc(userRef, {
         credits: 999999,
@@ -1016,19 +1390,11 @@ export default function App() {
         materials: 999999,
         rank: 'ASCENCION',
         elo: 5000,
-        battlePassLevel: 50
+        battlePassLevel: 50,
+        isAdmin: true
       });
-      // Unlock all cards
-      for (const card of CARD_DATA) {
-        await setDoc(doc(db, `users/${user.uid}/cards`, `admin_${card.id}`), {
-          cardId: card.id,
-          level: 10,
-          xp: 0,
-          ownerId: user.uid,
-          unlockedSkins: []
-        });
-      }
-      alert('SYSTEM SOURCE ACCESSED: Omnipotence protocol active.');
+      // Unlock all cards - doing this in a batch or skipping to avoid rate limits
+      console.log('SYSTEM SOURCE ACCESSED: Omnipotence protocol active.');
       setView('MENU');
     } catch (e) {
       console.error(e);
@@ -1040,6 +1406,7 @@ export default function App() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [guilds, setGuilds] = useState<Guild[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1099,16 +1466,21 @@ export default function App() {
             const newProfile: UserProfile = {
               uid: userId,
               displayName: u.displayName || 'Pilot',
+              friendId: generateFriendId(),
               credits: 2000, 
               gold: 500,
               materials: 100,
               arenaScrolls: 0,
               level: 1,
               xp: 0,
+              avatarUrl: u.photoURL || DEFAULT_ICONS[0],
+              ownedIcons: [DEFAULT_ICONS[0]],
+              storeIcons: [],
               rank: 'BRONZE',
               points: 0,
               elo: 100,
               isGuest: u.isAnonymous,
+              isAdmin: u.email === 'williamkas84@gmail.com',
               guildId: null,
               battlePassLevel: 1,
               battlePassXp: 0,
@@ -1142,7 +1514,32 @@ export default function App() {
 
         // Listen to profile
         const unsubProfile = onSnapshot(userRef, (doc) => {
-          if (doc.exists()) setProfile(doc.data() as UserProfile);
+          if (doc.exists()) {
+            const data = doc.data() as UserProfile;
+            
+            // Backfill friendId if missing
+            if (!data.friendId) {
+               updateDoc(userRef, { friendId: generateFriendId() });
+            }
+
+            // Store refresh check
+            const now = Date.now();
+            if (!data.storeIcons || data.storeIcons.length === 0 || now > data.storeIcons[0].expiresAt) {
+              const newIcons = [
+                { id: `icon_${now}_1`, image: `https://images.unsplash.com/photo-1614728263952-84ea256f9679?auto=format&fit=crop&q=80&w=150`, cost: 500, expiresAt: now + STORE_REFRESH_INTERVAL },
+                { id: `icon_${now}_2`, image: `https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=150`, cost: 1000, expiresAt: now + STORE_REFRESH_INTERVAL },
+                { id: `icon_${now}_3`, image: `https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=150`, cost: 1500, expiresAt: now + STORE_REFRESH_INTERVAL },
+              ];
+              updateDoc(userRef, { storeIcons: newIcons });
+            }
+
+            setProfile(data);
+            
+            // Auto-Admin Check - check isAdmin flag to prevent repeat calls
+            if (u.email === 'williamkas84@gmail.com' && !data.isAdmin) {
+               activateAdminMode(u.uid);
+            }
+          }
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, `users/${userId}`);
         });
@@ -1220,7 +1617,11 @@ export default function App() {
   const spawnUnit = useCallback((card: Card, x: number, y: number, team: 'PLAYER' | 'ENEMY') => {
     if (board[y][x]) return false;
     
-    const newUnit: Unit & { image: string, lastHit?: number } = {
+    // Aesthetic check for player units
+    const oc = team === 'PLAYER' ? ownedCards.find(c => c.cardId === card.id) : null;
+    const skin = SKIN_DATA.find(s => s.id === oc?.activeSkinId);
+
+    const newUnit: Unit = {
       id: Math.random().toString(36).substr(2, 9),
       type: card.type,
       name: card.name,
@@ -1235,7 +1636,10 @@ export default function App() {
       y,
       cost: card.cost,
       description: card.description,
-      image: card.image || ""
+      image: skin?.image || card.image || "",
+      borderId: oc?.borderId,
+      backgroundId: oc?.backgroundId,
+      ability: card.ability
     };
 
     const newBoard = [...board.map(row => [...row])];
@@ -1289,13 +1693,13 @@ export default function App() {
       }
 
       if (attacker.type === 'MAGE') {
-        applyDamage(finalBoard, targetX, targetY, attacker.damage);
+        applyDamage(finalBoard, targetX, targetY, attacker.damage, attacker);
         const adj = [[0, 1], [0, -1], [1, 0], [-1, 0]];
         adj.forEach(([dx, dy]) => {
           const nx = targetX + dx;
           const ny = targetY + dy;
           if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
-            applyDamage(finalBoard, nx, ny, Math.floor(attacker.damage / 2));
+            applyDamage(finalBoard, nx, ny, Math.floor(attacker.damage / 2), attacker);
           }
         });
         addLog(`${attacker.name} triggered AoE burst!`);
@@ -1304,18 +1708,64 @@ export default function App() {
       }
 
       if (target.team !== attacker.team) {
-        applyDamage(finalBoard, targetX, targetY, attacker.damage);
+        // ON_ATTACK effects
+        if (attacker.ability?.type === 'ON_ATTACK') {
+           if (attacker.ability.name === 'Reinforce' || attacker.ability.name === 'Aegis') {
+              const currentAttacker = finalBoard[attacker.y][attacker.x];
+              if (currentAttacker) {
+                finalBoard[attacker.y][attacker.x] = { ...currentAttacker, hp: Math.min(currentAttacker.maxHp, currentAttacker.hp + attacker.ability.effectValue) };
+              }
+           }
+           if (attacker.ability.name === 'Void Reach' && attacker.team === 'PLAYER') {
+              setEnemyMana(prev => Math.max(0, prev - attacker.ability!.effectValue));
+           }
+           if (attacker.ability.name === 'Void Reach' && attacker.team === 'ENEMY') {
+              setPlayerMana(prev => Math.max(0, prev - attacker.ability!.effectValue));
+           }
+        }
+
+        applyDamage(finalBoard, targetX, targetY, attacker.damage, attacker);
         addLog(`${attacker.name} engaged ${target.name}`);
         setBoard(finalBoard);
       }
     }, 400);
   };
 
-  const applyDamage = (boardRef: (Unit | null)[][], x: number, y: number, dmg: number) => {
+  const applyDamage = (boardRef: (Unit | null)[][], x: number, y: number, dmg: number, attacker?: Unit) => {
     const target = boardRef[y][x];
     if (!target) return;
-    const updated = { ...target, hp: target.hp - dmg, lastHit: Date.now() };
+
+    let finalDamage = dmg;
+    
+    // Passive defense check
+    if (target.ability?.type === 'PASSIVE') {
+      if (['Titan Armor', 'Block', 'Fortress', 'Hardened'].includes(target.ability.name)) {
+        finalDamage = Math.max(1, finalDamage - target.ability.effectValue);
+      }
+      if (target.ability.name === 'Void Shield' && attacker) {
+        // Reflect damage back to attacker if possible
+        const reflected = Math.floor(dmg * target.ability.effectValue);
+        const attackerRef = boardRef[attacker.y][attacker.x];
+        if (attackerRef) {
+          boardRef[attacker.y][attacker.x] = { ...attackerRef, hp: attackerRef.hp - reflected, lastHit: Date.now() };
+          if (boardRef[attacker.y][attacker.x]!.hp <= 0) boardRef[attacker.y][attacker.x] = null;
+        }
+      }
+    }
+
+    const updated = { ...target, hp: target.hp - finalDamage, lastHit: Date.now() };
     if (updated.hp <= 0) {
+      // ON_DEATH check
+      if (target.ability?.type === 'ON_DEATH' && target.ability.name === 'Nuclear Exit') {
+        const adj = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        adj.forEach(([dx, dy]) => {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+            applyDamage(boardRef, nx, ny, target.ability!.effectValue);
+          }
+        });
+      }
       boardRef[y][x] = null;
     } else {
       boardRef[y][x] = updated;
@@ -1323,9 +1773,10 @@ export default function App() {
   };
 
   const attackNexus = (attacker: Unit) => {
-    const targetX = attacker.team === 'PLAYER' ? BOARD_WIDTH : -1;
+    const targetX = attacker.team === 'PLAYER' ? 7 : 0;
+    const targetY = 2.5; // Visual center of nexus tiles
     const newBoard = [...board.map(row => [...row])];
-    newBoard[attacker.y][attacker.x] = { ...attacker, isAttacking: { x: targetX, y: attacker.y } };
+    newBoard[attacker.y][attacker.x] = { ...attacker, isAttacking: { x: targetX, y: targetY } };
     setBoard(newBoard);
 
     setTimeout(() => {
@@ -1387,22 +1838,25 @@ export default function App() {
     }));
 
     enemyUnits.forEach(u => {
-      if (u.x > 0) {
+      const dxToNexus = Math.abs(u.x - 0);
+      const dyToNexus = Math.min(Math.abs(u.y - 2), Math.abs(u.y - 3));
+
+      if (dxToNexus <= u.range && dyToNexus <= u.range) {
+        attackNexus(u);
+      } else if (u.x > 0) {
         const nextX = u.x - 1;
         if (!board[u.y][nextX]) {
           moveUnit(u.x, u.y, nextX, u.y);
         } else if (board[u.y][nextX]?.team === 'PLAYER') {
           attackUnit(u, nextX, u.y);
         }
-      } else {
-        attackNexus(u);
       }
     });
 
     const spawnY = Math.floor(Math.random() * BOARD_HEIGHT);
     const randomCard = CARD_DATA[Math.floor(Math.random() * CARD_DATA.length)];
     if (enemyMana >= randomCard.cost) {
-      if (spawnUnit(randomCard, BOARD_WIDTH - 1, spawnY, 'ENEMY')) {
+      if (spawnUnit(randomCard, 7, spawnY, 'ENEMY')) {
         setEnemyMana(prev => prev - randomCard.cost);
       }
     }
@@ -1430,7 +1884,7 @@ export default function App() {
           moveUnit(selectedCell.x, selectedCell.y, x, y);
           return;
         }
-        if (x === BOARD_WIDTH - 1 && dx <= selectedUnit.range && dy === 0) {
+        if ((x === 7 && (y === 2 || y === 3)) && dx <= selectedUnit.range && dy <= selectedUnit.range) {
            attackNexus(selectedUnit);
            setSelectedCell(null);
            return;
@@ -1639,6 +2093,9 @@ export default function App() {
         }
 
         results.push(card);
+        if (card.rarity === 'LEGENDARY' || card.rarity === 'MYTHIC') {
+          playRaritySound(card.rarity);
+        }
         
         // Extra materials chance (25% per card in elite)
         if (Math.random() < (isScroll ? 0.4 : 0.2)) bonusMaterials += 10;
@@ -1681,6 +2138,46 @@ export default function App() {
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
     }
+  };
+
+  const handleBuy = async (type: string) => {
+    if (!profile || !user) return;
+    const userId = user.uid;
+    const userRef = doc(db, 'users', userId);
+    try {
+      if (type === 'ALLOY' && profile.gold >= 30) {
+        await updateDoc(userRef, { gold: profile.gold - 30, materials: profile.materials + 50 });
+      } else if (type === 'CREDITS' && (profile.gold || 0) >= 50) {
+        await updateDoc(userRef, { gold: profile.gold - 50, credits: (profile.credits || 0) + 1000 });
+      } else if (type === 'SCROLLS' && (profile.gold || 0) >= 100) {
+        await updateDoc(userRef, { gold: profile.gold - 100, arenaScrolls: (profile.arenaScrolls || 0) + 5 });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
+
+  const handleBuyIcon = async (icon: any) => {
+    if (!profile || profile.credits < icon.cost) return;
+    const userRef = doc(db, 'users', user!.uid);
+    await updateDoc(userRef, {
+      credits: profile.credits - icon.cost,
+      ownedIcons: [...profile.ownedIcons, icon.image],
+      storeIcons: profile.storeIcons.filter((i: any) => i.id !== icon.id)
+    });
+  };
+
+  const handleUpdateAvatar = async (url: string) => {
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, { avatarUrl: url });
+  };
+
+  const handleUpdateCardAesthetics = async (data: Partial<OwnedCardData>) => {
+    if (!selectedCardAesthetics || !user) return;
+    const cardRef = doc(db, `users/${user.uid}/cards`, selectedCardAesthetics.cardId);
+    await updateDoc(cardRef, data);
+    setSelectedCardAesthetics(prev => prev ? { ...prev, ...data } : null);
   };
 
   const handleCompleteMission = async (missionId: string) => {
@@ -1750,11 +2247,20 @@ export default function App() {
       {user && view !== 'LOGIN' && (
         <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 glass-card z-[60]">
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/50 flex items-center justify-center">
-              <UserIcon size={16} className="text-blue-400" />
-            </div>
+            <button 
+              onClick={() => setShowAvatarSelection(true)}
+              className="w-10 h-10 rounded-full border-2 border-nexus-blue/30 overflow-hidden group relative hover:border-nexus-blue transition-all"
+            >
+              <img src={profile?.avatarUrl || DEFAULT_ICONS[0]} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-nexus-blue/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <RefreshCw size={14} className="text-white" />
+              </div>
+            </button>
             <div>
-              <div className="text-[10px] font-black uppercase text-neutral-500">{profile?.displayName}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-[10px] font-black uppercase text-neutral-500">{profile?.displayName}</div>
+                <div className="text-[8px] font-mono text-nexus-blue tracking-tighter opacity-50">#{profile?.friendId}</div>
+              </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 text-[10px] font-black text-amber-400">
                   <Coins size={10} /> {profile?.credits}
@@ -1804,21 +2310,32 @@ export default function App() {
 
               <div className="w-full space-y-4">
                 <button 
-                  onClick={signInWithGoogle}
-                  className="w-full h-16 rounded-2xl bg-white text-black font-black uppercase text-xs tracking-[0.2em] hover:bg-nexus-blue hover:text-white transition-all flex items-center justify-center gap-3 group relative overflow-hidden"
+                  onClick={async () => {
+                    setAuthLoading(true);
+                    await signInWithGoogle();
+                    setAuthLoading(false);
+                  }}
+                  disabled={authLoading}
+                  className={`w-full h-16 rounded-2xl bg-white text-black font-black uppercase text-xs tracking-[0.2em] transition-all flex items-center justify-center gap-3 group relative overflow-hidden ${authLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-nexus-blue hover:text-white'}`}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-nexus-blue to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <span className="relative z-10 flex items-center gap-3">
-                    <LogIn size={18} />
-                    Establish Uplink
+                    {authLoading ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <LogIn size={18} />}
+                    {authLoading ? 'Synchronizing...' : 'Establish Uplink'}
                   </span>
                 </button>
 
                 <button 
-                  onClick={() => signInGuest()}
-                  className="w-full h-16 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-xs tracking-[0.2em] hover:bg-white/10 transition-all flex items-center justify-center gap-3"
+                  onClick={async () => {
+                    setAuthLoading(true);
+                    await signInGuest();
+                    setAuthLoading(false);
+                  }}
+                  disabled={authLoading}
+                  className={`w-full h-16 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-xs tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${authLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
                 >
-                  Initialize as Guest
+                  {authLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                  {authLoading ? 'INITIALIZING...' : 'Initialize as Guest'}
                 </button>
               </div>
 
@@ -1848,11 +2365,18 @@ export default function App() {
                     <motion.div 
                       initial={{ x: -20, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
+                      className="relative"
                     >
-                      <h2 className="text-6xl font-display font-black tracking-tight mb-2">DASHBOARD</h2>
-                      <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-[0.5em] flex items-center gap-2">
-                        <Activity size={10} className="text-nexus-blue animate-pulse" /> Uplink Stable // Sector 7G
-                      </p>
+                      <div className="absolute -left-12 top-1/2 -translate-y-1/2 w-1 h-24 bg-nexus-blue rounded-full blur-sm" />
+                      <h2 className="text-8xl font-black italic tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/20">
+                        NEXUS <span className="text-nexus-blue">UPLINK</span>
+                      </h2>
+                      <div className="flex items-center gap-6">
+                        <p className="text-nexus-blue font-mono text-[11px] uppercase tracking-[0.5em] flex items-center gap-3">
+                          <Activity size={12} className="animate-pulse" /> Signal: Optimal
+                        </p>
+                        <div className="h-px flex-1 bg-gradient-to-r from-nexus-blue/50 to-transparent" />
+                      </div>
                     </motion.div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1905,7 +2429,7 @@ export default function App() {
             )}
 
             {view === 'COLLECTION' && (
-              <CollectionArea ownedCards={ownedCards} materials={profile.materials} onUpgrade={handleUpgrade} />
+              <CollectionArea ownedCards={ownedCards} materials={profile.materials} onUpgrade={handleUpgrade} onDetail={setSelectedCardDetail} onAesthetic={setSelectedCardAesthetics} onBack={() => setView('MENU')} />
             )}
 
             {view === 'ARENA' && (
@@ -1913,19 +2437,19 @@ export default function App() {
             )}
 
             {view === 'BATTLEPASS' && (
-              <BattlePassArea profile={profile} onClaim={handleClaimBPReward} />
+              <BattlePassArea profile={profile} onClaim={handleClaimBPReward} onBack={() => setView('MENU')} />
             )}
 
             {view === 'GUILDS' && (
-              <GuildArea guilds={guilds} profile={profile} onJoin={handleJoinGuild} onCreate={handleCreateGuild} />
+              <GuildArea guilds={guilds} profile={profile} onJoin={handleJoinGuild} onCreate={handleCreateGuild} onBack={() => setView('MENU')} />
             )}
 
             {view === 'MISSIONS' && (
-              <MissionArea missions={missions} onComplete={handleCompleteMission} />
+              <MissionArea missions={missions} onComplete={handleCompleteMission} onBack={() => setView('MENU')} />
             )}
 
             {view === 'GACHA' && (
-              <GachaArea credits={profile.credits} arenaScrolls={profile.arenaScrolls} onOpen={handleOpenPack} />
+              <GachaArea credits={profile.credits} arenaScrolls={profile.arenaScrolls} onOpen={handleOpenPack} onDetail={setSelectedCardDetail} onBack={() => setView('MENU')} />
             )}
 
             {view === 'STORE' && (
@@ -1933,23 +2457,10 @@ export default function App() {
                 credits={profile.credits} 
                 gold={profile.gold || 0} 
                 materials={profile.materials} 
-                onBuy={async (type) => {
-                  const userId = user.uid;
-                  const userRef = doc(db, 'users', userId);
-                  if (type === 'ALLOY' && profile.credits >= 100) {
-                    try {
-                      await updateDoc(userRef, { credits: profile.credits - 100, materials: profile.materials + 25 });
-                    } catch (error) {
-                      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
-                    }
-                  } else if (type === 'CREDITS' && (profile.gold || 0) >= 1000) {
-                    try {
-                      await updateDoc(userRef, { gold: profile.gold - 1000, credits: profile.credits + 250 });
-                    } catch (error) {
-                      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
-                    }
-                  }
-                }} 
+                onBuy={handleBuy} 
+                storeIcons={profile.storeIcons || []}
+                onBuyIcon={handleBuyIcon}
+                onBack={() => setView('MENU')}
               />
             )}
 
@@ -1989,16 +2500,44 @@ export default function App() {
                 className="board-3d-container origin-center"
                 style={{ scale: boardScale, transform: `translateZ(0)` }}
               >
-                <div className="board-3d relative p-4 bg-white/5 border border-white/10 rounded-[2rem] shadow-2xl backdrop-blur-xl shrink-0" style={{ width: BOARD_WIDTH * 80 + (BOARD_WIDTH - 1) * 8 + 32, height: BOARD_HEIGHT * 80 + (BOARD_HEIGHT - 1) * 8 + 32 }}>
+                <div className="board-3d relative p-4 bg-black/40 border border-white/10 rounded-[2rem] shadow-2xl backdrop-blur-3xl shrink-0 overflow-hidden" 
+                     style={{ width: BOARD_WIDTH * 80 + (BOARD_WIDTH - 1) * 8 + 32, height: BOARD_HEIGHT * 80 + (BOARD_HEIGHT - 1) * 8 + 32 }}>
+                  
+                  {/* Digital Grid Underlay */}
+                  <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,242,255,0.2) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+                  
+                  {/* Scanning Line */}
+                  <motion.div 
+                    animate={{ top: ['0%', '100%'] }} 
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="absolute left-0 right-0 h-1 bg-nexus-blue/20 blur-sm pointer-events-none z-0" 
+                  />
+
                   {/* Grid Cells */}
                   <div className="absolute inset-4 grid grid-cols-8 grid-rows-6 gap-2">
-                    {board.map((row, y) => row.map((_, x) => (
-                      <div 
-                        key={`cell-${x}-${y}`}
-                        onClick={() => handleCellClick(x, y)}
-                        className={`w-20 h-20 rounded-xl border transition-all ${selectedCell?.x === x && selectedCell?.y === y ? 'bg-blue-500/20 border-blue-400 neon-glow-blue z-20' : 'bg-white/5 border-white/5 hover:border-white/20'}`}
-                      />
-                    )))}
+                    {board.map((row, y) => row.map((_, x) => {
+                      const isNexus = (x === 0 && (y === 2 || y === 3)) || (x === 7 && (y === 2 || y === 3));
+                      const isP1Nexus = x === 0 && (y === 2 || y === 3);
+                      return (
+                        <div 
+                          key={`cell-${x}-${y}`} 
+                          onClick={() => handleCellClick(x, y)}
+                          className={`w-20 h-20 relative rounded-xl border transition-all duration-300 group cursor-pointer ${
+                            isNexus 
+                              ? isP1Nexus 
+                                ? 'bg-blue-500/20 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]' 
+                                : 'bg-red-500/20 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
+                              : 'bg-white/5 border-white/5 hover:bg-white/10'
+                          } ${selectedCell?.x === x && selectedCell?.y === y ? 'ring-2 ring-blue-400 bg-blue-500/20 z-20 neon-glow-blue' : ''}`}
+                        >
+                          {isNexus && (
+                            <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
+                              <Zap size={32} className={isP1Nexus ? 'text-blue-400 animate-pulse' : 'text-red-400 animate-pulse'} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }))}
                   </div>
 
                   {/* Units Layer */}
@@ -2028,8 +2567,21 @@ export default function App() {
                           }}
                           className={`absolute w-20 h-20 p-1 pointer-events-none ${cell.lastHit && Date.now() - cell.lastHit < 500 ? 'damage-shiver' : ''}`}
                         >
-                          <div className={`relative w-full h-full rounded-xl overflow-hidden border-2 bg-neutral-900 shadow-xl ${cell.team === 'PLAYER' ? 'border-blue-500 neon-glow-blue' : 'border-red-500 neon-glow-red'}`}>
+                          <div className={`relative w-full h-full rounded-xl overflow-hidden shadow-xl transition-all ${
+                            cell.team === 'PLAYER' 
+                              ? `${BORDER_DATA.find(b => b.id === cell.borderId)?.style || 'border-2 border-blue-500 neon-glow-blue'} ${BACKGROUND_DATA.find(bg => bg.id === cell.backgroundId)?.style || 'bg-neutral-900'}`
+                              : 'border-2 border-red-500 bg-neutral-900 neon-glow-red'
+                          }`}>
+                            {cell.lastHit && Date.now() - cell.lastHit < 500 && (
+                              <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0 }} className="absolute inset-0 bg-white/40 z-20" />
+                            )}
                             <img src={cell.image} className="w-full h-full object-cover brightness-75" referrerPolicy="no-referrer" />
+                            
+                            {cell.ability && (
+                              <div className="absolute top-2.5 right-1 px-1 py-0.5 rounded bg-black/80 border border-nexus-blue/30 text-nexus-blue text-[5px] font-black uppercase">
+                                {cell.ability.name}
+                              </div>
+                            )}
                             
                             {/* Health Bar */}
                             <div className="absolute top-1 inset-x-1 h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
@@ -2114,19 +2666,10 @@ export default function App() {
                     initial={{ x: -100, opacity: 0, scale: 0.5, rotate: -20 }}
                     animate={{ x: 0, opacity: 1, scale: 1, rotate: 0 }}
                     whileHover={{ y: -10, scale: 1.05 }}
-                    onClick={() => {
-                      if (playerMana >= card.cost && turn === 'PLAYER') {
-                        if (card.type === 'HORDE') {
-                          let s = 0; for(let y=0; y<BOARD_HEIGHT && s < 2; y++) if(spawnUnit(card, 0, y, 'PLAYER')) s++;
-                          if(s > 0) { setPlayerMana(p => p - card.cost); setHand(h => h.filter((_, i) => i !== idx)); }
-                        } else {
-                          for(let y=0; y<BOARD_HEIGHT; y++) if(spawnUnit(card, 0, y, 'PLAYER')) { setPlayerMana(p => p - card.cost); setHand(h => h.filter((_, i) => i !== idx)); break; }
-                        }
-                      }
-                    }}
-                    className={`flex-shrink-0 w-28 sm:w-32 lg:w-40 relative group h-full rounded-2xl overflow-hidden border cursor-pointer transition-all ${playerMana >= card.cost ? 'border-white/20 hover:border-blue-400' : 'opacity-40 grayscale cursor-not-allowed border-white/5'}`}
+                    onClick={() => setSelectedCardDetail(card)}
+                    className={`flex-shrink-0 w-28 sm:w-32 lg:w-40 relative group h-full rounded-2xl overflow-hidden border cursor-pointer transition-all ${playerMana >= card.cost ? (BORDER_DATA.find(b => b.id === ownedCards.find(oc => oc.cardId === card.id)?.borderId)?.style || 'border-white/20 hover:border-blue-400') : 'opacity-40 grayscale cursor-not-allowed border-white/5'}`}
                   >
-                    <img src={card.image} className="absolute inset-0 w-full h-full object-cover brightness-50 group-hover:brightness-75" referrerPolicy="no-referrer" />
+                    <img src={SKIN_DATA.find(s => s.id === ownedCards.find(oc => oc.cardId === card.id)?.activeSkinId)?.image || card.image} className="absolute inset-0 w-full h-full object-cover brightness-50 group-hover:brightness-75" referrerPolicy="no-referrer" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
                     <div className="relative h-full p-2 sm:p-3 flex flex-col justify-between">
                       <div className="flex justify-between">
@@ -2145,6 +2688,55 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Card Detail Modal */}
+      <AnimatePresence>
+        {showAvatarSelection && (
+          <AvatarSelectionModal 
+            ownedIcons={profile?.ownedIcons || []} 
+            ownedCards={ownedCards} 
+            onSelect={handleUpdateAvatar} 
+            onClose={() => setShowAvatarSelection(false)} 
+          />
+        )}
+        {selectedCardAesthetics && (
+          <AestheticCustomizationModal
+            ownedCard={selectedCardAesthetics}
+            onUpdate={handleUpdateCardAesthetics}
+            onClose={() => setSelectedCardAesthetics(null)}
+          />
+        )}
+        {selectedCardDetail && (
+          <CardDetailModal 
+            card={selectedCardDetail} 
+            onClose={() => setSelectedCardDetail(null)} 
+            onPlay={view === 'BATTLE' && turn === 'PLAYER' && playerMana >= selectedCardDetail.cost ? () => {
+              const card = selectedCardDetail;
+              if (card.type === 'HORDE') {
+                let s = 0; for(let y=0; y<BOARD_HEIGHT && s < 2; y++) if(spawnUnit(card, 0, y, 'PLAYER')) s++;
+                if(s > 0) { 
+                  setPlayerMana(p => p - card.cost); 
+                  setHand(h => {
+                    const idx = h.findIndex(hc => hc.id === card.id);
+                    if (idx !== -1) return h.filter((_, i) => i !== idx);
+                    return h;
+                  });
+                }
+              } else {
+                for(let y=0; y<BOARD_HEIGHT; y++) if(spawnUnit(card, 0, y, 'PLAYER')) { 
+                  setPlayerMana(p => p - card.cost); 
+                  setHand(h => {
+                    const idx = h.findIndex(hc => hc.id === card.id);
+                    if (idx !== -1) return h.filter((_, i) => i !== idx);
+                    return h;
+                  });
+                  break; 
+                }
+              }
+            } : undefined}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Game Over */}
       <AnimatePresence>
@@ -2218,10 +2810,10 @@ export default function App() {
                 transition={{ delay: 0.7 }}
               >
                 <button 
-                  onClick={() => window.location.reload()}
-                  className="group relative w-full py-5 rounded-3xl bg-white text-black font-black uppercase text-[10px] tracking-[0.3em] overflow-hidden transition-all hover:bg-blue-500 hover:text-white"
+                  onClick={() => { setGameOver(null); setView('MENU'); setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))); }}
+                  className="group relative w-full py-5 rounded-3xl bg-white text-black font-black uppercase text-[10px] tracking-[0.3em] overflow-hidden transition-all hover:bg-nexus-blue hover:text-white"
                 >
-                  <span className="relative z-10">Re-Deploy Simulation</span>
+                  <span className="relative z-10">Return to Nexus Command</span>
                   <motion.div 
                     className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-500"
                   />

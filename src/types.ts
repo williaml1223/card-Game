@@ -1,4 +1,4 @@
-export type Archetype = 'TANK' | 'SNIPER' | 'HEALER' | 'HORDE' | 'MAGE';
+export type Archetype = 'TANK' | 'SNIPER' | 'HEALER' | 'HORDE' | 'MAGE' | 'STRIKER';
 
 export interface Unit {
   id: string;
@@ -15,6 +15,11 @@ export interface Unit {
   y: number;
   cost: number;
   description: string;
+  image?: string;
+  borderId?: string;
+  backgroundId?: string;
+  ability?: Card['ability'];
+  effects?: { type: 'HEAL' | 'DAMAGE' | 'BUFF', value: number, id: string }[];
   lastHit?: number;
   isAttacking?: { x: number, y: number } | null;
 }
@@ -29,11 +34,18 @@ export interface Card {
   image?: string;
   voiceLine?: string;
   rarity?: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY' | 'MYTHIC';
+  ability?: {
+    name: string;
+    description: string;
+    type: 'PASSIVE' | 'ON_ATTACK' | 'ON_SPAWN' | 'ON_DEATH';
+    effectValue: number;
+  };
 }
 
 export interface UserProfile {
   uid: string;
   displayName: string;
+  friendId: string;
   credits: number;
   gold: number;
   materials: number;
@@ -44,10 +56,14 @@ export interface UserProfile {
   points: number;
   elo: number;
   isGuest?: boolean;
+  isAdmin?: boolean;
   guildId?: string | null;
   battlePassLevel: number;
   battlePassXp: number;
   claimedRewards: number[]; // Array of level indices
+  avatarUrl?: string;
+  ownedIcons: string[];
+  storeIcons: { id: string; image: string; cost: number; expiresAt: number }[];
 }
 
 export interface CardSkin {
@@ -83,6 +99,8 @@ export interface OwnedCardData {
   ownerId: string;
   activeSkinId?: string | null;
   unlockedSkins: string[];
+  borderId?: string;
+  backgroundId?: string;
 }
 
 export interface GameState {

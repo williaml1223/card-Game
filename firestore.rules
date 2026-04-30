@@ -30,31 +30,24 @@ service cloud.firestore {
     // User Profile Rules
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && 
-        incoming().keys().hasAll(['uid', 'displayName', 'credits', 'gold', 'materials', 'arenaScrolls', 'level', 'xp', 'rank', 'points']) &&
-        incoming().uid == userId &&
-        incoming().credits == 2000 &&
-        incoming().gold == 500 &&
-        incoming().materials == 100 &&
-        incoming().arenaScrolls == 0 &&
-        incoming().level == 1 &&
-        incoming().xp == 0 &&
-        incoming().rank == 'BRONZE' &&
-        incoming().points == 0;
+      allow create: if isOwner(userId);
       
       allow update: if isOwner(userId) && 
-        incoming().diff(existing()).affectedKeys().hasAny(['credits', 'gold', 'materials', 'arenaScrolls', 'level', 'xp', 'rank', 'points', 'guildId']);
+        incoming().diff(existing()).affectedKeys().hasAny([
+          'credits', 'gold', 'materials', 'arenaScrolls', 'level', 'xp', 'rank', 'points', 
+          'guildId', 'friendId', 'avatarUrl', 'ownedIcons', 'storeIcons', 'isAdmin', 'elo',
+          'battlePassLevel', 'battlePassXp', 'claimedRewards'
+        ]);
 
       // User Cards Rules
       match /cards/{cardId} {
         allow list, get: if isOwner(userId);
-        allow create: if isOwner(userId) && 
-          incoming().keys().hasAll(['cardId', 'level', 'xp', 'ownerId']) &&
-          incoming().ownerId == userId;
+        allow create: if isOwner(userId);
         
         allow update: if isOwner(userId) && 
-          incoming().diff(existing()).affectedKeys().hasOnly(['level', 'xp']) && 
-          incoming().ownerId == existing().ownerId;
+          incoming().diff(existing()).affectedKeys().hasAny([
+            'level', 'xp', 'activeSkinId', 'unlockedSkins', 'borderId', 'backgroundId'
+          ]);
       }
 
       // Missions
@@ -62,7 +55,7 @@ service cloud.firestore {
         allow list, get: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId) && 
-          incoming().diff(existing()).affectedKeys().hasOnly(['completed']);
+          incoming().diff(existing()).affectedKeys().hasAny(['completed']);
       }
     }
 
