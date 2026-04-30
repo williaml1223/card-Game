@@ -23,25 +23,6 @@
     perspective: 2000px;
   }
 
-  .board-3d-container {
-    @apply relative transition-transform duration-1000 ease-out;
-    transform-style: preserve-3d;
-  }
-
-  .board-3d {
-    transform: rotateX(50deg) rotateZ(-12deg) translateY(-20px);
-    transform-style: preserve-3d;
-  }
-
-  .unit-3d-wrapper {
-    transform-style: preserve-3d;
-  }
-
-  .unit-3d {
-    transform: rotateX(-50deg) rotateY(12deg) translateZ(20px);
-    transform-style: preserve-3d;
-  }
-
   .neon-glow-blue {
     box-shadow: 0 0 15px rgba(0, 242, 255, 0.4), 0 0 5px rgba(0, 242, 255, 0.2);
   }
@@ -56,6 +37,36 @@
 
   .glass-card {
     @apply bg-black/40 border border-white/10 backdrop-blur-2xl;
+  }
+
+  .halftone-overlay {
+    background-image: radial-gradient(#fff 1px, transparent 1px);
+    background-size: 4px 4px;
+    opacity: 0.05;
+  }
+
+  .comic-shadow {
+    box-shadow: 12px 12px 0px 0px #000;
+  }
+
+  .comic-border {
+    border: 6px solid #000;
+  }
+
+  .comic-title {
+    -webkit-text-stroke: 2px black;
+    filter: drop-shadow(4px 4px 0px black);
+  }
+
+  .shake {
+    animation: shake-anim 0.3s cubic-bezier(.36,.07,.19,.97) both;
+  }
+
+  @keyframes shake-anim {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
   }
 
   .custom-scrollbar::-webkit-scrollbar {

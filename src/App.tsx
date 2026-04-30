@@ -26,15 +26,24 @@ import {
   Plus,
   Dna,
   LogIn,
-  X
+  X,
+  Crosshair,
+  ShieldAlert,
+  Flame,
+  Volume2,
+  VolumeX,
+  ShieldQuestion,
+  Database,
+  ArrowLeft,
+  Check,
 } from 'lucide-react';
-import { Archetype, Unit, Card, UserProfile, OwnedCardData, Guild, Mission, CardSkin } from './types';
+import { Archetype, Unit, Card, UserProfile, OwnedCardData, Guild, Mission, LocationState, Deck } from './types';
 import { auth, db, signInWithGoogle, signInGuest } from './firebase';
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, updateDoc } from 'firebase/firestore';
-import { CARD_DATA, SKIN_DATA, BOARD_WIDTH, BOARD_HEIGHT, MAX_MANA, STORE_REFRESH_INTERVAL, BORDER_DATA, BACKGROUND_DATA, DEFAULT_ICONS } from './constants';
+import { CARD_DATA, SKIN_DATA, MAX_MANA, MAX_TURNS, STORE_REFRESH_INTERVAL, BORDER_DATA, BACKGROUND_DATA, DEFAULT_ICONS, getRandomLocations } from './constants';
 
-type ViewMode = 'LOGIN' | 'MENU' | 'BATTLE' | 'GACHA' | 'STORE' | 'COLLECTION' | 'ARENA' | 'GUILDS' | 'MISSIONS' | 'BATTLEPASS';
+type ViewMode = 'LOGIN' | 'MENU' | 'BATTLE' | 'GACHA' | 'STORE' | 'COLLECTION' | 'ARENA' | 'GUILDS' | 'MISSIONS' | 'BATTLEPASS' | 'DECK_BUILDER';
 
 const BATTLEPASS_LEVELS = 50;
 const BATTLEPASS_XP_PER_LEVEL = 1000;
@@ -307,7 +316,7 @@ const AvatarSelectionModal = ({ ownedIcons, ownedCards, onSelect, onClose }: { o
   );
 };
 
-const CardDetailModal = ({ card, onClose, onPlay }: { card: Card, onClose: () => void, onPlay?: () => void }) => {
+const CardDetailModal = ({ card, locations, onClose, onPlay }: { card: Card, locations?: LocationState[], onClose: () => void, onPlay?: (locIdx: number) => void }) => {
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -338,8 +347,10 @@ const CardDetailModal = ({ card, onClose, onPlay }: { card: Card, onClose: () =>
 
           <div className="absolute bottom-6 left-6 right-6">
              <div className="p-4 bg-white text-black border-4 border-black shadow-[8px_8px_0_#000] -rotate-1">
-                <div className="text-[10px] font-black uppercase tracking-tighter opacity-50 mb-1">Transmission Log</div>
-                <div className="text-sm font-black italic tracking-tight leading-tight">"{card.voiceLine}"</div>
+                <div className="text-[10px] font-black uppercase tracking-tighter opacity-50 mb-1">REVEAL_EFFECT</div>
+                <div className="text-sm font-black italic tracking-tight leading-tight">
+                  {card.effect?.description || "No specific neuro-link effect detected."}
+                </div>
              </div>
           </div>
         </div>
@@ -353,47 +364,42 @@ const CardDetailModal = ({ card, onClose, onPlay }: { card: Card, onClose: () =>
           </div>
 
           <div>
-            <h2 className="text-6xl font-black tracking-tighter uppercase mb-6 italic text-white drop-shadow-[4px_4px_0_theme(colors.black)]">
+            <h2 className="text-6xl font-black tracking-tighter uppercase mb-2 italic text-white drop-shadow-[4px_4px_0_theme(colors.black)]">
               {card.name}
             </h2>
+            <div className="text-nexus-blue font-black uppercase tracking-[0.2em] text-[10px] mb-6">Combat Power: {card.stats.power}</div>
             
             <p className="text-zinc-400 text-sm leading-relaxed mb-8 font-medium">
               {card.description}
             </p>
             
-            <div className="grid grid-cols-2 gap-6">
-              {[
-                { label: 'Integrity', val: card.stats.hp, icon: Activity, color: 'text-green-400' },
-                { label: 'Output', val: card.stats.damage, icon: Sword, color: 'text-rose-400' },
-                { label: 'Radius', val: card.stats.range, icon: Target, color: 'text-blue-400' },
-                { label: 'Velocity', val: card.stats.movement, icon: ArrowRight, color: 'text-amber-400' }
-              ].map(stat => (
-                <div key={stat.label} className="group flex items-center gap-4 p-4 bg-black/40 border-4 border-black shadow-[6px_6px_0_rgba(0,0,0,0.3)] hover:-translate-y-1 transition-transform">
-                  <stat.icon className={`${stat.color} shrink-0`} size={24} />
-                  <div>
-                    <div className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">{stat.label}</div>
-                    <div className="text-2xl font-black text-white">{stat.val}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {onPlay && locations && (
+               <div className="space-y-4">
+                 <div className="text-[10px] font-black underline uppercase text-neutral-500 tracking-widest">Select Node for Deployment</div>
+                 <div className="grid grid-cols-3 gap-3">
+                   {locations.map((loc, i) => (
+                     <button
+                       key={loc.id}
+                       onClick={() => { onPlay(i); onClose(); }}
+                       disabled={loc.playerUnits.length >= 4 || (loc.isRevealed && loc.effectType === 'NO_CARDS')}
+                       className="p-3 bg-black/40 border-2 border-black rounded-xl hover:bg-nexus-blue hover:text-black transition-all disabled:opacity-30 disabled:grayscale"
+                     >
+                        <div className="text-[8px] font-bold uppercase mb-1 opacity-60">Node {i+1}</div>
+                        <div className="text-[10px] font-black truncate">{loc.name}</div>
+                     </button>
+                   ))}
+                 </div>
+               </div>
+            )}
           </div>
 
-          <div className="flex gap-6">
+          <div className="flex gap-4">
             <button 
               onClick={onClose}
-              className="px-8 py-5 border-4 border-black bg-neutral-700 text-white font-black uppercase text-[12px] tracking-[0.2em] shadow-[6px_6px_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+              className="px-6 py-4 border-4 border-black bg-neutral-700 text-zinc-400 font-black uppercase text-[10px] tracking-[0.2em] shadow-[4px_4px_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
             >
-              Abort
+              Cancel
             </button>
-            {onPlay && (
-               <button 
-                onClick={() => { onPlay(); onClose(); }}
-                className="flex-1 py-5 border-4 border-black bg-nexus-blue text-black font-black uppercase text-[12px] tracking-[0.3em] shadow-[8px_8px_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
-              >
-                Execute Deployment
-              </button>
-            )}
           </div>
         </div>
       </motion.div>
@@ -418,6 +424,18 @@ const playPlacementSound = () => {
   
   osc.start();
   osc.stop(ctx.currentTime + 0.15);
+};
+
+const playLegendarySound = () => {
+  const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2012/2012-preview.mp3');
+  audio.volume = 0.3;
+  audio.play().catch(() => {});
+};
+
+const playMythicSound = () => {
+  const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3');
+  audio.volume = 0.4;
+  audio.play().catch(() => {});
 };
 
 const speakLine = (line: string, type: Archetype) => {
@@ -491,6 +509,53 @@ const getArchetypeIcon = (type: Archetype) => {
   }
 };
 
+const GameCard = ({ card, onClick, className, isPlayable = true, isSelected = false, ...props }: { card: Card, onClick?: () => void, className?: string, isPlayable?: boolean, isSelected?: boolean, [key: string]: any }) => {
+  return (
+    <motion.div
+      whileHover={isPlayable ? { y: -5, scale: 1.1, zIndex: 100 } : {}}
+      whileTap={isPlayable ? { scale: 0.95 } : {}}
+      onClick={isPlayable ? onClick : undefined}
+      className={`relative aspect-[3/4.5] rounded-xl overflow-hidden border-2 transition-all p-1 shadow-lg group ${isPlayable ? 'cursor-pointer hover:border-white/30' : 'cursor-not-allowed opacity-40 grayscale'} ${isSelected ? 'border-nexus-blue ring-2 ring-nexus-blue/50' : 'border-white/10'} ${className}`}
+      {...props}
+    >
+      <img src={card.image} className={`absolute inset-0 w-full h-full object-cover rounded-lg transition-opacity ${isSelected ? 'opacity-30' : 'opacity-60'}`} referrerPolicy="no-referrer" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
+      
+      {/* Cost */}
+      <div className="absolute top-1 left-1 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center font-black text-[10px] shadow-lg border border-white/20 z-10 text-white">
+        {card.cost}
+      </div>
+
+      {/* Power */}
+      <div className="absolute top-1 right-1 w-6 h-6 rounded-lg bg-orange-600 flex items-center justify-center font-black text-[10px] shadow-lg border border-white/20 italic z-10 text-white">
+        {card.stats.power}
+      </div>
+
+      {/* Selected Indicator */}
+      {isSelected && (
+        <div className="absolute inset-0 flex items-center justify-center z-20">
+          <Check className="text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]" size={32} />
+        </div>
+      )}
+
+      {/* Card Info */}
+      <div className="absolute inset-x-0 bottom-0 p-2 flex flex-col gap-0.5 z-10 text-left">
+        <div className="text-[9px] font-black uppercase text-white truncate drop-shadow-md tracking-tighter">{card.name}</div>
+        <div className="text-[7px] font-medium text-zinc-300 leading-tight line-clamp-2 bg-black/60 p-1.5 rounded-lg border border-white/5 backdrop-blur-[2px] h-[34px] flex items-center">
+          {card.effect?.description || card.description}
+        </div>
+      </div>
+      
+      {/* Rarity Glow Overlay */}
+      <div className={`absolute inset-0 rounded-lg pointer-events-none border-2 opacity-30 ${
+        card.rarity === 'MYTHIC' ? 'border-red-500 blur-[1px]' : 
+        card.rarity === 'LEGENDARY' ? 'border-yellow-500 blur-[1px]' : 
+        'border-transparent'
+      }`} />
+    </motion.div>
+  );
+};
+
 const RarityGlow = {
   COMMON: 'shadow-[inset_0_0_15px_rgba(255,255,255,0.05)] border-white/10',
   RARE: 'shadow-[0_0_20px_rgba(59,130,246,0.2),inset_0_0_10px_rgba(59,130,246,0.1)] border-blue-500/40',
@@ -528,6 +593,167 @@ const playRaritySound = (rarity: Card['rarity']) => {
   } catch (e) {
     console.warn("Audio Context failed", e);
   }
+};
+
+const DeckBuilderArea = ({ ownedCards, decks, onBack, user }: { ownedCards: OwnedCardData[], decks: Deck[], onBack: () => void, user: any }) => {
+  const [currentDeck, setCurrentDeck] = useState<string[]>([]);
+  const [deckName, setDeckName] = useState('New Array');
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const saveDeck = async () => {
+    if (currentDeck.length < 5) {
+      alert("Deck must have at least 5 cards for simulation.");
+      return;
+    }
+    const deckId = editingId || `deck_${Date.now()}`;
+    const deckRef = doc(db, `users/${user.uid}/decks`, deckId);
+    await setDoc(deckRef, {
+      id: deckId,
+      name: deckName,
+      cardIds: currentDeck,
+      ownerId: user.uid,
+      createdAt: Date.now()
+    });
+    setEditingId(null);
+    setCurrentDeck([]);
+    setDeckName('New Array');
+  };
+
+  const deleteDeck = async (id: string) => {
+    // Basic delete logic
+    await setDoc(doc(db, `users/${user.uid}/decks`, id), {}, { merge: false }); // Or real delete if tool allows
+  };
+
+  const toggleCard = (cardId: string) => {
+    setCurrentDeck(prev => {
+      if (prev.includes(cardId)) return prev.filter(id => id !== cardId);
+      if (prev.length >= 12) return prev;
+      return [...prev, cardId];
+    });
+  };
+
+  return (
+    <div className="flex-1 flex flex-col p-8 gap-8 overflow-hidden bg-black/20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <button onClick={onBack} className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-4xl font-serif italic text-white flex items-center gap-3">
+              <Database className="text-blue-500" /> Deck Builder
+            </h2>
+            <div className="flex gap-4 mt-1">
+              <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1">Construct Neural Arrays</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+           <input 
+             value={deckName}
+             onChange={e => setDeckName(e.target.value)}
+             className="bg-neutral-900 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-colors w-64"
+             placeholder="Deck Name..."
+           />
+           <button 
+             onClick={saveDeck}
+             className="px-8 py-2.5 bg-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/20"
+           >
+             Save Array
+           </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex gap-8 overflow-hidden">
+        {/* Collection Section */}
+        <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+           <div className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Available Nodes ({ownedCards.length})</div>
+           <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pr-2 custom-scrollbar content-start">
+             {ownedCards.map(oc => {
+               const card = CARD_DATA.find(c => c.id === oc.cardId);
+               if (!card) return null;
+               const isSelected = currentDeck.includes(card.id);
+               return (
+                 <GameCard 
+                   key={oc.cardId}
+                   card={card}
+                   isSelected={isSelected}
+                   onClick={() => toggleCard(card.id)}
+                 />
+               )
+             })}
+           </div>
+        </div>
+
+        {/* Current Deck Section */}
+        <div className="w-80 flex flex-col gap-4 overflow-hidden border-l border-white/5 pl-8">
+           <div className="flex items-center justify-between">
+              <div className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Active Array ({currentDeck.length}/12)</div>
+              {editingId && (
+                <button onClick={() => { setEditingId(null); setCurrentDeck([]); setDeckName('New Array'); }} className="text-[8px] font-black uppercase text-red-500 hover:underline">Cancel Edit</button>
+              )}
+           </div>
+
+           <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-2 custom-scrollbar">
+              {currentDeck.length === 0 ? (
+                <div className="flex-1 border-2 border-dashed border-white/5 rounded-3xl flex flex-col items-center justify-center p-6 text-center text-zinc-600">
+                   <Plus size={32} className="mb-4 opacity-20" />
+                   <p className="text-[10px] font-bold uppercase tracking-widest">No nodes linked</p>
+                </div>
+              ) : (
+                currentDeck.map(id => {
+                  const card = CARD_DATA.find(c => c.id === id);
+                  if (!card) return null;
+                  return (
+                    <motion.div 
+                      key={id}
+                      layout
+                      initial={{ x: 20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      className="bg-white/[0.03] border border-white/5 rounded-2xl p-3 flex items-center gap-4 group hover:bg-white/[0.05] transition-colors"
+                    >
+                       <img src={card.image} className="w-12 h-12 rounded-lg object-cover" />
+                       <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-black uppercase text-white truncate">{card.name}</div>
+                          <div className="flex gap-2 text-[8px] font-black text-zinc-500">
+                             <span className="text-blue-400">{card.cost}E</span>
+                             <span className="text-orange-400">{card.stats.power}P</span>
+                          </div>
+                       </div>
+                       <button onClick={() => toggleCard(id)} className="w-8 h-8 rounded-full bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                          <X size={14} />
+                       </button>
+                    </motion.div>
+                  )
+                })
+              )}
+           </div>
+
+           {/* Saved Decks List */}
+           <div className="mt-4 pt-4 border-t border-white/5">
+              <div className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-4">Saved Arrays</div>
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                 {decks.map(deck => (
+                   <button 
+                     key={deck.id}
+                     onClick={() => {
+                        setEditingId(deck.id);
+                        setCurrentDeck(deck.cardIds);
+                        setDeckName(deck.name);
+                     }}
+                     className={`w-full p-4 rounded-2xl border transition-all text-left group ${editingId === deck.id ? 'border-blue-500 bg-blue-500/5' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'}`}
+                   >
+                      <div className="text-xs font-bold text-white mb-1">{deck.name}</div>
+                      <div className="text-[8px] font-black text-zinc-600 uppercase">{deck.cardIds.length} Nodes Linked</div>
+                   </button>
+                 ))}
+              </div>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const MissionArea = ({ missions, onComplete, onBack }: { missions: Mission[], onComplete: (id: string) => void, onBack: () => void }) => {
@@ -847,9 +1073,10 @@ const GachaArea = ({ credits, arenaScrolls, onOpen, onDetail, onBack }: { credit
                 
                 <div className="absolute inset-x-0 bottom-0 p-5">
                   <div className={`text-[8px] font-black uppercase tracking-widest mb-1 ${card.rarity === 'LEGENDARY' ? 'text-amber-400' : card.rarity === 'MYTHIC' ? 'text-rose-500' : 'text-neutral-400'}`}>
-                    {card.rarity}
+                    {card.rarity} | {card.cost}E | {card.stats.power}P
                   </div>
                   <div className="text-sm font-black text-white truncate leading-tight">{card.name}</div>
+                  <div className="text-[7px] text-neutral-400 mt-1 line-clamp-1 italic">{card.effect?.description || card.description}</div>
                   <div className="text-[8px] text-neutral-500 mt-1 uppercase font-black">{card.type}</div>
                 </div>
               </motion.div>
@@ -1108,7 +1335,8 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade, onDetail, onAestheti
                   r === 'MYTHIC' ? 'bg-rose-600 text-white' :
                   r === 'LEGENDARY' ? 'bg-amber-500 text-black' :
                   r === 'EPIC' ? 'bg-purple-600 text-white' :
-                  r === 'RARE' ? 'bg-blue-600 text-white' : 'bg-white text-black'
+                  r === 'RARE' ? 'bg-blue-600 text-white' : 
+                  r === 'ALL' ? 'bg-nexus-blue text-black shadow-[0_0_10px_#00f2ff]' : 'bg-white text-black'
                 ) : 'text-neutral-500 hover:text-white'}`}
               >
                 {r}
@@ -1146,9 +1374,12 @@ const CollectionArea = ({ ownedCards, materials, onUpgrade, onDetail, onAestheti
 
                     <div>
                       <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${card.rarity === 'LEGENDARY' ? 'text-amber-400' : card.rarity === 'MYTHIC' ? 'text-rose-500' : 'text-neutral-400'}`}>
-                        {card.rarity}
+                        {card.rarity} | {card.cost}E | {card.stats.power}P
                       </div>
-                      <div className="text-sm font-black truncate text-white">{card.name}</div>
+                      <div className="text-sm font-black truncate text-white leading-tight mb-1">{card.name}</div>
+                      <div className="text-[7px] font-medium text-zinc-500 leading-tight line-clamp-2 bg-black/20 p-1.5 rounded-lg border border-white/5 mb-2">
+                        {card.effect?.description || card.description}
+                      </div>
                       
                       <button 
                         onClick={(e) => { e.stopPropagation(); if (materials >= 20) onUpgrade(oc.cardId); }}
@@ -1425,28 +1656,76 @@ export default function App() {
     }
   };
 
-  const [board, setBoard] = useState<(Unit | null)[][]>(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
-  const [playerHp, setPlayerHp] = useState(100);
-  const [enemyHp, setEnemyHp] = useState(100);
-  const [playerMana, setPlayerMana] = useState(5);
-  const [enemyMana, setEnemyMana] = useState(5);
+  const [locations, setLocations] = useState<LocationState[]>([]);
+  const [playerMana, setPlayerMana] = useState(1);
+  const [enemyMana, setEnemyMana] = useState(1);
+  const [currentTurn, setCurrentTurn] = useState(1);
   const [turn, setTurn] = useState<'PLAYER' | 'ENEMY'>('PLAYER');
-  const [selectedCell, setSelectedCell] = useState<{ x: number, y: number } | null>(null);
   const [hand, setHand] = useState<Card[]>([]);
-  const [gameOver, setGameOver] = useState<string | null>(null);
-  const [log, setLog] = useState<string[]>(['Nexus Core online. Tactical map loaded.']);
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null);
+  const [showDeckSelector, setShowDeckSelector] = useState(false);
+  const [pendingAction, setPendingAction] = useState<ViewMode | null>(null);
+  const [deckToEdit, setDeckToEdit] = useState<Deck | null>(null);
+  const [gameOver, setGameOver] = useState<'PLAYER' | 'ENEMY' | 'TIE' | null>(null);
+  const [bgMusic, setBgMusic] = useState<HTMLAudioElement | null>(null);
+  const [musicEnabled, setMusicEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, `users/${user.uid}/decks`));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deck));
+      setDecks(data);
+      if (profile?.activeDeckId) {
+        const active = data.find(d => d.id === profile.activeDeckId);
+        if (active) setSelectedDeck(active);
+      }
+    });
+    return () => unsubscribe();
+  }, [user, profile?.activeDeckId]);
+
+  useEffect(() => {
+    if (view === 'BATTLE' && musicEnabled) {
+      const audio = new Audio('https://assets.mixkit.co/music/preview/mixkit-cyberpunk-city-847.mp3');
+      audio.loop = true;
+      audio.volume = 0.2;
+      audio.play().catch(() => {});
+      setBgMusic(audio);
+      return () => {
+        audio.pause();
+        setBgMusic(null);
+      };
+    }
+  }, [view, musicEnabled]);
+  const [log, setLog] = useState<string[]>(['Neural Link established. Synching Locations...']);
   const [boardScale, setBoardScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const locationRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const checkDropLocation = (x: number, y: number, card: Card) => {
+    locationRefs.current.forEach((ref, index) => {
+      if (ref) {
+        const rect = ref.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+          playCard(card, index, 'PLAYER');
+        }
+      }
+    });
+  };
 
   const startBattle = () => {
-    setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
-    setPlayerHp(100);
-    setEnemyHp(100);
-    setPlayerMana(5);
-    setEnemyMana(5);
+    const freshLocations = getRandomLocations();
+    // Reveal first location immediately
+    freshLocations[0].isRevealed = true;
+    
+    setLocations(freshLocations);
+    setPlayerMana(1);
+    setEnemyMana(1);
+    setCurrentTurn(1);
     setTurn('PLAYER');
     setGameOver(null);
-    setLog(['Nexus Core online. Tactical map loaded.']);
+    setLog(['Battle initialized. Node 1 Active.']);
     setView('BATTLE');
   };
 
@@ -1601,215 +1880,131 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  // Initialize hand from owned cards
+  // Initialize hand
   useEffect(() => {
-    if (view === 'BATTLE' && ownedCards.length > 0) {
-      const initialHand = Array(4).fill(null).map(() => {
-        const oc = ownedCards[Math.floor(Math.random() * ownedCards.length)];
-        return CARD_DATA.find(c => c.id === oc.cardId) || CARD_DATA[0];
-      });
-      setHand(initialHand);
+    if (view === 'BATTLE') {
+      let sourcePool = ownedCards.map(oc => CARD_DATA.find(c => c.id === oc.cardId)).filter(Boolean) as Card[];
+      
+      if (selectedDeck && selectedDeck.cardIds.length > 0) {
+        sourcePool = selectedDeck.cardIds.map(id => CARD_DATA.find(c => c.id === id)).filter(Boolean) as Card[];
+      }
+
+      if (sourcePool.length > 0) {
+        const initialHand = Array(4).fill(null).map(() => {
+          return sourcePool[Math.floor(Math.random() * sourcePool.length)];
+        });
+        setHand(initialHand);
+      }
     }
-  }, [view, ownedCards]);
+  }, [view, ownedCards, selectedDeck]);
 
   const addLog = (msg: string) => setLog(prev => [msg, ...prev].slice(0, 4));
 
-  const spawnUnit = useCallback((card: Card, x: number, y: number, team: 'PLAYER' | 'ENEMY') => {
-    if (board[y][x]) return false;
-    
-    // Aesthetic check for player units
-    const oc = team === 'PLAYER' ? ownedCards.find(c => c.cardId === card.id) : null;
-    const skin = SKIN_DATA.find(s => s.id === oc?.activeSkinId);
+  const triggerOnReveal = useCallback((unit: Unit, location: LocationState, allLocations: LocationState[]) => {
+    const effect = unit.effect;
+    if (!effect || effect.type !== 'ON_REVEAL') return;
 
+    if (unit.name === 'Quantum Reaper' || unit.name === 'Neural Spiker') {
+      const enemies = unit.team === 'PLAYER' ? location.enemyUnits : location.playerUnits;
+      if (enemies.length > 0) {
+        const target = enemies[Math.floor(Math.random() * enemies.length)];
+        target.power = Math.max(0, target.power - (effect.value || 2));
+        triggerShake();
+        addLog(`${unit.name} damaged ${target.name} for ${effect.value || 2}`);
+      }
+    }
+
+    if (unit.name === 'Cyber Medic') {
+      const allies = unit.team === 'PLAYER' ? location.playerUnits : location.enemyUnits;
+      const target = allies.find(a => a.id !== unit.id);
+      if (target) {
+        target.power += (effect.value || 3);
+        addLog(`${unit.name} boosted ${target.name} by ${effect.value || 3}`);
+      }
+    }
+
+    if (unit.name === 'The Broker') {
+      if (unit.team === 'PLAYER') {
+        setHand(prev => {
+          if (prev.length === 0) return prev;
+          const idx = Math.floor(Math.random() * prev.length);
+          const newHand = [...prev];
+          newHand[idx] = { ...newHand[idx], cost: Math.max(0, newHand[idx].cost - 1) };
+          return newHand;
+        });
+        addLog(`${unit.name} optimized hand costs.`);
+      }
+    }
+  }, [ownedCards]);
+
+  const calculatePower = useCallback((loc: LocationState) => {
+    let pPower = 0;
+    let ePower = 0;
+
+    const isPlayerArchitectPresent = loc.playerUnits.some(u => u.name === 'The Architect');
+    const isEnemyArchitectPresent = loc.enemyUnits.some(u => u.name === 'The Architect');
+
+    loc.playerUnits.forEach(u => {
+      let curr = u.power;
+      if (u.name === 'The Sentinel' && loc.playerUnits.length === 4) curr += 3;
+      if (u.effect?.type === 'VANILLA' && isPlayerArchitectPresent) curr += 4;
+      pPower += (u.isRevealed ? curr : 0);
+    });
+
+    loc.enemyUnits.forEach(u => {
+      let curr = u.power;
+      if (u.name === 'The Sentinel' && loc.enemyUnits.length === 4) curr += 3;
+      if (u.effect?.type === 'VANILLA' && isEnemyArchitectPresent) curr += 4;
+      ePower += (u.isRevealed ? curr : 0);
+    });
+
+    if (loc.isRevealed && loc.effectType === 'POWER_BOOST') {
+      pPower += loc.playerUnits.length * 2;
+      ePower += loc.enemyUnits.length * 2;
+    }
+
+    return { pPower, ePower };
+  }, []);
+
+  const playCard = (card: Card, locationIndex: number, team: 'PLAYER' | 'ENEMY') => {
+    const loc = locations[locationIndex];
+    if (team === 'PLAYER' && playerMana < card.cost) return false;
+    if (team === 'ENEMY' && enemyMana < card.cost) return false;
+    if (loc.playerUnits.length + loc.enemyUnits.length >= 8) return false; // Max 4 per side per location
+    if (loc.isRevealed && loc.effectType === 'NO_CARDS') return false;
+
+    const oc = team === 'PLAYER' ? ownedCards.find(c => c.cardId === card.id) : null;
+    
     const newUnit: Unit = {
       id: Math.random().toString(36).substr(2, 9),
-      type: card.type,
+      cardId: card.id,
       name: card.name,
-      hp: card.stats.hp || 100,
-      maxHp: card.stats.hp || 100,
-      damage: card.stats.damage || 10,
-      nexusDamage: card.stats.nexusDamage || 10,
-      range: card.stats.range || 1,
-      movement: card.stats.movement || 1,
-      team,
-      x,
-      y,
+      type: card.type,
+      power: card.stats.power,
+      basePower: card.stats.power,
       cost: card.cost,
-      description: card.description,
-      image: skin?.image || card.image || "",
-      borderId: oc?.borderId,
-      backgroundId: oc?.backgroundId,
-      ability: card.ability
+      image: card.image,
+      team,
+      locationIndex,
+      isRevealed: false, // Revealed at end of turn phase
+      effect: card.effect
     };
 
-    const newBoard = [...board.map(row => [...row])];
-    newBoard[y][x] = newUnit;
-    setBoard(newBoard);
-    playPlacementSound();
-    if (team === 'PLAYER' && (card as any).voiceLine) {
-       speakLine((card as any).voiceLine, card.type);
-    }
-    return true;
-  }, [board]);
-
-  const moveUnit = (fromX: number, fromY: number, toX: number, toY: number) => {
-    const unit = board[fromY][fromX];
-    if (!unit || board[toY][toX]) return;
-
-    const newBoard = [...board.map(row => [...row])];
-    newBoard[toY][toX] = { ...unit, x: toX, y: toY };
-    newBoard[fromY][fromX] = null;
-    setBoard(newBoard);
-    setSelectedCell(null);
-    addLog(`${unit.name} translated to [${toX}, ${toY}]`);
-  };
-
-  const attackUnit = (attacker: Unit, targetX: number, targetY: number) => {
-    const target = board[targetY][targetX];
-    if (!target) return;
-
-    const newBoard = [...board.map(row => [...row])];
-    
-    // Set attacking state
-    const currentAttacker = { ...attacker, isAttacking: { x: targetX, y: targetY } };
-    newBoard[attacker.y][attacker.x] = currentAttacker;
-    setBoard([...newBoard]);
-
-    setTimeout(() => {
-      const finalBoard = [...board.map(row => [...row])];
-      const refreshingAttacker = finalBoard[attacker.y][attacker.x];
-      if (refreshingAttacker) {
-        finalBoard[attacker.y][attacker.x] = { ...refreshingAttacker, isAttacking: null };
-      }
-
-      if (attacker.type === 'HEALER') {
-        if (target.team === attacker.team) {
-          const healedTarget = { ...target, hp: Math.min(target.maxHp, target.hp + attacker.damage) };
-          finalBoard[targetY][targetX] = healedTarget;
-          addLog(`${attacker.name} restored status of ${target.name}`);
-        }
-        setBoard(finalBoard);
-        return;
-      }
-
-      if (attacker.type === 'MAGE') {
-        applyDamage(finalBoard, targetX, targetY, attacker.damage, attacker);
-        const adj = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-        adj.forEach(([dx, dy]) => {
-          const nx = targetX + dx;
-          const ny = targetY + dy;
-          if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
-            applyDamage(finalBoard, nx, ny, Math.floor(attacker.damage / 2), attacker);
-          }
-        });
-        addLog(`${attacker.name} triggered AoE burst!`);
-        setBoard(finalBoard);
-        return;
-      }
-
-      if (target.team !== attacker.team) {
-        // ON_ATTACK effects
-        if (attacker.ability?.type === 'ON_ATTACK') {
-           if (attacker.ability.name === 'Reinforce' || attacker.ability.name === 'Aegis') {
-              const currentAttacker = finalBoard[attacker.y][attacker.x];
-              if (currentAttacker) {
-                finalBoard[attacker.y][attacker.x] = { ...currentAttacker, hp: Math.min(currentAttacker.maxHp, currentAttacker.hp + attacker.ability.effectValue) };
-              }
-           }
-           if (attacker.ability.name === 'Void Reach' && attacker.team === 'PLAYER') {
-              setEnemyMana(prev => Math.max(0, prev - attacker.ability!.effectValue));
-           }
-           if (attacker.ability.name === 'Void Reach' && attacker.team === 'ENEMY') {
-              setPlayerMana(prev => Math.max(0, prev - attacker.ability!.effectValue));
-           }
-        }
-
-        applyDamage(finalBoard, targetX, targetY, attacker.damage, attacker);
-        addLog(`${attacker.name} engaged ${target.name}`);
-        setBoard(finalBoard);
-      }
-    }, 400);
-  };
-
-  const applyDamage = (boardRef: (Unit | null)[][], x: number, y: number, dmg: number, attacker?: Unit) => {
-    const target = boardRef[y][x];
-    if (!target) return;
-
-    let finalDamage = dmg;
-    
-    // Passive defense check
-    if (target.ability?.type === 'PASSIVE') {
-      if (['Titan Armor', 'Block', 'Fortress', 'Hardened'].includes(target.ability.name)) {
-        finalDamage = Math.max(1, finalDamage - target.ability.effectValue);
-      }
-      if (target.ability.name === 'Void Shield' && attacker) {
-        // Reflect damage back to attacker if possible
-        const reflected = Math.floor(dmg * target.ability.effectValue);
-        const attackerRef = boardRef[attacker.y][attacker.x];
-        if (attackerRef) {
-          boardRef[attacker.y][attacker.x] = { ...attackerRef, hp: attackerRef.hp - reflected, lastHit: Date.now() };
-          if (boardRef[attacker.y][attacker.x]!.hp <= 0) boardRef[attacker.y][attacker.x] = null;
-        }
-      }
-    }
-
-    const updated = { ...target, hp: target.hp - finalDamage, lastHit: Date.now() };
-    if (updated.hp <= 0) {
-      // ON_DEATH check
-      if (target.ability?.type === 'ON_DEATH' && target.ability.name === 'Nuclear Exit') {
-        const adj = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-        adj.forEach(([dx, dy]) => {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
-            applyDamage(boardRef, nx, ny, target.ability!.effectValue);
-          }
-        });
-      }
-      boardRef[y][x] = null;
+    const newLocations = [...locations];
+    if (team === 'PLAYER') {
+      newLocations[locationIndex].playerUnits.push(newUnit);
+      setPlayerMana(prev => prev - card.cost);
+      setHand(prev => prev.filter(c => c.id !== card.id));
     } else {
-      boardRef[y][x] = updated;
+      newLocations[locationIndex].enemyUnits.push(newUnit);
+      setEnemyMana(prev => prev - card.cost);
     }
-  };
-
-  const attackNexus = (attacker: Unit) => {
-    const targetX = attacker.team === 'PLAYER' ? 7 : 0;
-    const targetY = 2.5; // Visual center of nexus tiles
-    const newBoard = [...board.map(row => [...row])];
-    newBoard[attacker.y][attacker.x] = { ...attacker, isAttacking: { x: targetX, y: targetY } };
-    setBoard(newBoard);
-
-    setTimeout(() => {
-      const finalBoard = [...board.map(row => [...row])];
-      const refreshingAttacker = finalBoard[attacker.y][attacker.x];
-      if (refreshingAttacker) {
-        finalBoard[attacker.y][attacker.x] = { ...refreshingAttacker, isAttacking: null };
-      }
-      setBoard(finalBoard);
-
-      if (attacker.type === 'HEALER') {
-        if (attacker.team === 'PLAYER') {
-          setPlayerHp(prev => Math.min(100, prev + 5));
-          addLog(`Nexus Integrity restored.`);
-        } else {
-          setEnemyHp(prev => Math.min(100, prev + 5));
-          addLog(`Enemy Nexus Integrity restored.`);
-        }
-        return;
-      }
-
-      if (attacker.team === 'PLAYER') {
-        const newHp = Math.max(0, enemyHp - attacker.nexusDamage);
-        setEnemyHp(newHp);
-        addLog(`Direct hit on Enemy Nexus!`);
-        if (newHp === 0) setGameOver('PLAYER');
-      } else {
-        const newHp = Math.max(0, playerHp - attacker.nexusDamage);
-        setPlayerHp(newHp);
-        addLog(`CRITICAL: Nexus hit!`);
-        if (newHp === 0) setGameOver('ENEMY');
-      }
-    }, 400);
+    setLocations(newLocations);
+    if (card.rarity === 'MYTHIC') playMythicSound();
+    else if (card.rarity === 'LEGENDARY') playLegendarySound();
+    else playPlacementSound();
+    
+    return true;
   };
 
   const endTurn = () => {
@@ -1817,89 +2012,132 @@ export default function App() {
     
     if (turn === 'PLAYER') {
       setTurn('ENEMY');
-      setEnemyMana(prev => Math.min(MAX_MANA, prev + 2));
-      setTimeout(() => processEnemyTurn(), 1000);
+      setTimeout(() => processEnemyTurn(), 800);
     } else {
-      setTurn('PLAYER');
-      setPlayerMana(prev => Math.min(MAX_MANA, prev + 2));
-      setHand(prev => {
-        if (prev.length >= 6 || ownedCards.length === 0) return prev;
-        const oc = ownedCards[Math.floor(Math.random() * ownedCards.length)];
-        const card = CARD_DATA.find(c => c.id === oc.cardId) || CARD_DATA[0];
-        return [...prev, card];
-      });
+      resolveTurn();
     }
   };
 
   const processEnemyTurn = () => {
-    const enemyUnits: Unit[] = [];
-    board.forEach(row => row.forEach(unit => {
-      if (unit && unit.team === 'ENEMY') enemyUnits.push(unit);
+    // Basic AI: Play most expensive card to random valid location
+    const possibleCards = CARD_DATA.filter(c => c.cost <= enemyMana).sort((a, b) => b.cost - a.cost);
+    if (possibleCards.length > 0) {
+      const card = possibleCards[0];
+      const validLocs = [0, 1, 2].filter(i => locations[i].enemyUnits.length < 4 && (!locations[i].isRevealed || locations[i].effectType !== 'NO_CARDS'));
+      if (validLocs.length > 0) {
+        const locIdx = validLocs[Math.floor(Math.random() * validLocs.length)];
+        playCard(card, locIdx, 'ENEMY');
+      }
+    }
+    resolveTurn();
+  };
+
+  const resolveTurn = () => {
+    const nextTurn = currentTurn + 1;
+    let newLocations = locations.map(l => ({ 
+      ...l, 
+      playerUnits: l.playerUnits.map(u => ({ ...u })), 
+      enemyUnits: l.enemyUnits.map(u => ({ ...u })) 
     }));
 
-    enemyUnits.forEach(u => {
-      const dxToNexus = Math.abs(u.x - 0);
-      const dyToNexus = Math.min(Math.abs(u.y - 2), Math.abs(u.y - 3));
-
-      if (dxToNexus <= u.range && dyToNexus <= u.range) {
-        attackNexus(u);
-      } else if (u.x > 0) {
-        const nextX = u.x - 1;
-        if (!board[u.y][nextX]) {
-          moveUnit(u.x, u.y, nextX, u.y);
-        } else if (board[u.y][nextX]?.team === 'PLAYER') {
-          attackUnit(u, nextX, u.y);
-        }
-      }
+    // 1. Reveal Locations
+    newLocations.forEach(l => {
+      if (l.revealTurn === nextTurn) l.isRevealed = true;
     });
 
-    const spawnY = Math.floor(Math.random() * BOARD_HEIGHT);
-    const randomCard = CARD_DATA[Math.floor(Math.random() * CARD_DATA.length)];
-    if (enemyMana >= randomCard.cost) {
-      if (spawnUnit(randomCard, 7, spawnY, 'ENEMY')) {
-        setEnemyMana(prev => prev - randomCard.cost);
-      }
-    }
-
-    setTurn('PLAYER');
-    setPlayerMana(prev => Math.min(MAX_MANA, prev + 2));
-    setHand(prev => {
-      if (prev.length >= 6 || ownedCards.length === 0) return prev;
-      const oc = ownedCards[Math.floor(Math.random() * ownedCards.length)];
-      const card = CARD_DATA.find(c => c.id === oc.cardId) || CARD_DATA[0];
-      return [...prev, card];
+    // 2. Reveal Units & Trigger On Reveal
+    newLocations.forEach(l => {
+      [...l.playerUnits, ...l.enemyUnits].forEach(u => {
+        if (!u.isRevealed) {
+          u.isRevealed = true;
+          if (u.effect?.type === 'ON_REVEAL') {
+             triggerOnReveal(u, l, newLocations);
+          }
+        }
+      });
     });
-  };
 
-  const handleCellClick = (x: number, y: number) => {
-    if (turn !== 'PLAYER' || gameOver) return;
-    const unit = board[y][x];
+    // 3. End Turn Effects
+    newLocations.forEach(l => {
+       [...l.playerUnits, ...l.enemyUnits].forEach(u => {
+          if (u.effect?.type === 'END_TURN') {
+             if (u.name === 'Ghost in the Machine') {
+                const enemies = u.team === 'PLAYER' ? l.enemyUnits : l.playerUnits;
+                if (enemies.length > 0) {
+                   const target = enemies[Math.floor(Math.random() * enemies.length)];
+                   target.power = Math.max(0, target.power - 1);
+                   u.power += 1;
+                }
+             }
+          }
+       });
+    });
 
-    if (selectedCell) {
-      const selectedUnit = board[selectedCell.y][selectedCell.x];
-      if (selectedUnit && selectedUnit.team === 'PLAYER') {
-        const dx = Math.abs(x - selectedCell.x);
-        const dy = Math.abs(y - selectedCell.y);
-        if (!unit && (dx + dy <= selectedUnit.movement)) {
-          moveUnit(selectedCell.x, selectedCell.y, x, y);
-          return;
-        }
-        if ((x === 7 && (y === 2 || y === 3)) && dx <= selectedUnit.range && dy <= selectedUnit.range) {
-           attackNexus(selectedUnit);
-           setSelectedCell(null);
-           return;
-        }
-        if (unit && unit.team === 'ENEMY' && (dx + dy <= selectedUnit.range)) {
-          attackUnit(selectedUnit, x, y);
-          setSelectedCell(null);
-          return;
-        }
-      }
-      setSelectedCell(null);
-    } else if (unit && unit.team === 'PLAYER') {
-      setSelectedCell({ x, y });
+    // 4. Update Powers
+    newLocations.forEach(l => {
+      const { pPower, ePower } = calculatePower(l);
+      l.playerPower = pPower;
+      l.enemyPower = ePower;
+    });
+
+    setLocations(newLocations);
+
+    if (nextTurn > MAX_TURNS) {
+      checkWinner();
+    } else {
+      setCurrentTurn(nextTurn);
+      setPlayerMana(Math.min(MAX_MANA, nextTurn));
+      setEnemyMana(Math.min(MAX_MANA, nextTurn));
+      setTurn('PLAYER');
+      
+      setHand(prevHand => {
+        if (prevHand.length >= 7) return prevHand;
+        const oc = ownedCards[Math.floor(Math.random() * ownedCards.length)];
+        const card = CARD_DATA.find(c => c.id === oc.cardId) || CARD_DATA[0];
+        return [...prevHand, card];
+      });
     }
   };
+
+  const checkWinner = () => {
+    let pWins = 0;
+    let eWins = 0;
+    locations.forEach(l => {
+      if (l.playerPower > l.enemyPower) pWins++;
+      else if (l.enemyPower > l.playerPower) eWins++;
+    });
+
+    let result: 'PLAYER' | 'ENEMY' | 'TIE' = 'TIE';
+    if (pWins > eWins) result = 'PLAYER';
+    else if (eWins > pWins) result = 'ENEMY';
+    else {
+      // Tie breaker: Total Power Difference? Simplified: Total Power
+      const pTotal = locations.reduce((acc, l) => acc + l.playerPower, 0);
+      const eTotal = locations.reduce((acc, l) => acc + l.enemyPower, 0);
+      if (pTotal > eTotal) result = 'PLAYER';
+      else if (eTotal > pTotal) result = 'ENEMY';
+      else result = 'TIE';
+    }
+
+    setGameOver(result);
+    handleCombatResult(result);
+  };
+
+  const [showTurnOverlay, setShowTurnOverlay] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+
+  const triggerShake = () => {
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 300);
+  };
+
+  useEffect(() => {
+    if (view === 'BATTLE') {
+      setShowTurnOverlay(true);
+      const timer = setTimeout(() => setShowTurnOverlay(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentTurn, view]);
 
 
 
@@ -1945,15 +2183,30 @@ export default function App() {
     }
   };
 
-  const handleCombatResult = async () => {
+  const handleCombatResult = async (result: 'PLAYER' | 'ENEMY' | 'TIE') => {
     if (!profile || !user) return;
     
     const userId = user.uid;
     const userRef = doc(db, 'users', userId);
-    const win = Math.random() > 0.4;
+    const win = result === 'PLAYER';
+    const isTie = result === 'TIE';
     
-    let pointsChange = win ? 10 : -5;
-    let eloChange = win ? 25 : -20;
+    // Win Streak Logic
+    let currentStreak = profile.winStreak || 0;
+    let maxStreak = profile.maxWinStreak || 0;
+    
+    if (win) {
+      currentStreak++;
+      if (currentStreak > maxStreak) maxStreak = currentStreak;
+    } else if (!isTie) {
+      currentStreak = 0;
+    }
+    
+    let pointsChange = win ? 10 : isTie ? 0 : -5;
+    if (win && currentStreak >= 3) pointsChange += 5; // Win streak bonus
+
+    let eloChange = win ? 25 : isTie ? 5 : -20;
+    if (win && currentStreak >= 3) eloChange += 10;
     
     let newPoints = Math.max(0, (profile.points || 0) + pointsChange);
     let newElo = Math.max(0, (profile.elo || 100) + eloChange);
@@ -1979,6 +2232,16 @@ export default function App() {
 
     const goldEarned = win ? 250 : 50;
     const bpXpEarned = win ? 300 : 100;
+    
+    await updateDoc(userRef, {
+      points: newPoints,
+      elo: newElo,
+      rank: newRank,
+      gold: (profile.gold || 0) + goldEarned,
+      battlePassXp: (profile.battlePassXp || 0) + bpXpEarned,
+      winStreak: currentStreak,
+      maxWinStreak: maxStreak
+    });
     
     // Threshold bonuses
     let thresholdGoldBonus = 0;
@@ -2271,6 +2534,11 @@ export default function App() {
                 <div className="flex items-center gap-1 text-[10px] font-black text-rose-400">
                   <Trophy size={10} /> {profile?.arenaScrolls}
                 </div>
+                {profile?.winStreak ? (
+                   <div className="flex items-center gap-1 text-[10px] font-black text-orange-500">
+                     <Flame size={10} className={profile.winStreak >= 3 ? "animate-[bounce_0.5s_infinite]" : ""} /> {profile.winStreak}
+                   </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -2358,6 +2626,85 @@ export default function App() {
           {view !== 'BATTLE' && <TopBar profile={profile} onLogout={() => signOut(auth)} />}
           
           <div className="flex-1 relative flex flex-col overflow-hidden">
+            {/* Deck Selector Modal */}
+            <AnimatePresence>
+              {showDeckSelector && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl flex items-center justify-center p-6"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    className="glass-card w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col rounded-[3rem] border-white/5"
+                  >
+                    <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                      <div>
+                        <h2 className="text-4xl font-serif italic text-white leading-none">Select Neural Deck</h2>
+                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-2 px-1">Combat Simulation Preparation</p>
+                      </div>
+                      <button onClick={() => setShowDeckSelector(false)} className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 custom-scrollbar">
+                      {decks.length === 0 ? (
+                        <div className="col-span-full py-20 text-center">
+                           <Database className="mx-auto text-zinc-800 mb-4" size={48} />
+                           <p className="text-zinc-500 font-medium">No decks detected. Access Deck Builder to create your first array.</p>
+                           <button 
+                             onClick={() => { setShowDeckSelector(false); setView('DECK_BUILDER'); }}
+                             className="mt-6 px-8 py-3 bg-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-colors"
+                           >
+                             Open Deck Builder
+                           </button>
+                        </div>
+                      ) : (
+                        decks.map(deck => (
+                          <motion.button
+                            key={deck.id}
+                            whileHover={{ scale: 1.02 }}
+                            onClick={() => {
+                              setSelectedDeck(deck);
+                              if (pendingAction === 'BATTLE') startBattle();
+                              else if (pendingAction === 'ARENA') setView('ARENA');
+                              setShowDeckSelector(false);
+                            }}
+                            className={`p-6 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden group ${selectedDeck?.id === deck.id ? 'border-blue-500 bg-blue-500/5' : 'border-white/5 bg-white/[0.02] hover:border-white/20'}`}
+                          >
+                             <div className="flex justify-between items-start mb-4">
+                               <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                 <Database size={20} />
+                               </div>
+                               <div className="text-[10px] font-black text-neutral-600">{deck.cardIds.length} CARDS</div>
+                             </div>
+                             <div className="text-xl font-bold text-white mb-1">{deck.name}</div>
+                             <div className="text-[9px] font-black text-blue-500/50 uppercase tracking-widest">Neural Array Stable</div>
+                             
+                             <div className="absolute -bottom-4 -right-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                               <Database size={80} />
+                             </div>
+                          </motion.button>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="p-8 border-t border-white/5 bg-black/40">
+                       <button 
+                         onClick={() => { setShowDeckSelector(false); setView('DECK_BUILDER'); }}
+                         className="w-full py-5 border-2 border-white/10 rounded-full text-[11px] font-black uppercase tracking-[0.2em] hover:bg-white/5 transition-all"
+                       >
+                         Manage Neural Decks
+                       </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {view === 'MENU' && (
               <div className="flex-1 flex flex-col p-6 sm:p-12 gap-12 overflow-y-auto relative z-10 custom-scrollbar">
                 <div className="flex flex-col lg:flex-row gap-12 items-start">
@@ -2380,8 +2727,9 @@ export default function App() {
                     </motion.div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <MenuCard icon={<Sword />} title="Tactical Simulation" desc="Combat exercises vs AI" onClick={startBattle} color="blue" />
-                      <MenuCard icon={<Trophy />} title="Arena Nodes" desc="Synchronous PvP combat" onClick={() => setView('ARENA')} color="rose" />
+                      <MenuCard icon={<Sword />} title="Tactical Simulation" desc="Combat exercises vs AI" onClick={() => { setPendingAction('BATTLE'); setShowDeckSelector(true); }} color="blue" />
+                      <MenuCard icon={<Database />} title="Deck Builder" desc="Construct neural card arrays" onClick={() => setView('DECK_BUILDER')} color="indigo" />
+                      <MenuCard icon={<Trophy />} title="Arena Nodes" desc="Synchronous PvP combat" onClick={() => { setPendingAction('ARENA'); setShowDeckSelector(true); }} color="rose" />
                       <MenuCard icon={<Package />} title="Repository" desc="Neural unit management" onClick={() => setView('COLLECTION')} color="indigo" />
                       <MenuCard icon={<Sparkles />} title="Gacha Uplink" desc="Acquire prototype nodes" onClick={() => setView('GACHA')} color="cyan" />
                       <MenuCard icon={<Users />} title="Guild Network" desc="Cluster coordinate collective" onClick={() => setView('GUILDS')} color="emerald" />
@@ -2423,6 +2771,18 @@ export default function App() {
                        </div>
                        <div className="text-[10px] text-zinc-500 font-mono uppercase text-right">Unlock Tier {profile.battlePassLevel + 1}</div>
                     </div>
+
+                    <div className="glass-card p-6 rounded-3xl border-white/5 bg-gradient-to-br from-orange-500/10 to-transparent">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+                          <Flame size={24} className={profile.winStreak > 0 ? "animate-pulse" : ""} />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Link Streak</div>
+                          <div className="text-xl font-serif italic text-white leading-none mt-1">{profile.winStreak || 0} Wins</div>
+                        </div>
+                      </div>
+                    </div>
                   </motion.div>
                 </div>
               </div>
@@ -2442,6 +2802,15 @@ export default function App() {
 
             {view === 'GUILDS' && (
               <GuildArea guilds={guilds} profile={profile} onJoin={handleJoinGuild} onCreate={handleCreateGuild} onBack={() => setView('MENU')} />
+            )}
+
+            {view === 'DECK_BUILDER' && (
+              <DeckBuilderArea 
+                ownedCards={ownedCards} 
+                decks={decks} 
+                onBack={() => setView('MENU')} 
+                user={user} 
+              />
             )}
 
             {view === 'MISSIONS' && (
@@ -2465,226 +2834,211 @@ export default function App() {
             )}
 
             {view === 'BATTLE' && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 glass-card">
-            <div className="flex items-center gap-4">
-              <Cpu className="text-blue-500 animate-pulse" size={20} />
-              <div>
-                <div className="text-[10px] font-black uppercase text-neutral-500">Ally Core</div>
-                <div className="h-1.5 w-24 sm:w-32 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
-                  <motion.div animate={{ width: `${playerHp}%` }} className="h-full bg-blue-500 shadow-[0_0_10px_#00f2ff]" />
-                </div>
-              </div>
-            </div>
-
-            <div className={`px-2 py-1 rounded-lg border flex items-center gap-2 ${turn === 'PLAYER' ? 'border-blue-500/50 text-blue-400' : 'border-red-500/50 text-red-400'}`}>
-              <span className="text-[8px] font-black uppercase tracking-widest">{turn === 'PLAYER' ? 'Ally Phase' : 'Enemy Phase'}</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-[10px] font-black uppercase text-neutral-500">Enemy Core</div>
-                <div className="h-1.5 w-24 sm:w-32 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
-                  <motion.div animate={{ width: `${enemyHp}%` }} className="h-full bg-red-500 shadow-[0_0_100px_#ff0055] float-right" />
-                </div>
-              </div>
-              <Activity className="text-red-500" size={20} />
-            </div>
-          </div>
-
-          <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-            <div ref={containerRef} className="flex-1 perspective-2000 flex items-center justify-center p-4 relative overflow-hidden">
-              <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-[1px] bg-gradient-to-r from-transparent via-blue-500/10 to-transparent pointer-events-none" />
-              <motion.div 
-                layout
-                className="board-3d-container origin-center"
-                style={{ scale: boardScale, transform: `translateZ(0)` }}
-              >
-                <div className="board-3d relative p-4 bg-black/40 border border-white/10 rounded-[2rem] shadow-2xl backdrop-blur-3xl shrink-0 overflow-hidden" 
-                     style={{ width: BOARD_WIDTH * 80 + (BOARD_WIDTH - 1) * 8 + 32, height: BOARD_HEIGHT * 80 + (BOARD_HEIGHT - 1) * 8 + 32 }}>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cyber-glow.png')]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,black_100%)] opacity-60 pointer-events-none" />
+                
+                {/* Top Battle Bar */}
+                <div className="h-16 border-b border-white/5 bg-black/40 backdrop-blur-md flex items-center justify-between px-8 z-50">
+                  <div className="flex items-center gap-4">
+                    <motion.button 
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setMusicEnabled(!musicEnabled)}
+                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-colors ${musicEnabled ? 'border-blue-500 text-blue-500 bg-blue-500/10' : 'border-neutral-500 text-neutral-500 bg-neutral-500/10'}`}
+                    >
+                      {musicEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </motion.button>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 hidden sm:block">Tactical Audio Link</div>
+                  </div>
                   
-                  {/* Digital Grid Underlay */}
-                  <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,242,255,0.2) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-                  
-                  {/* Scanning Line */}
-                  <motion.div 
-                    animate={{ top: ['0%', '100%'] }} 
-                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                    className="absolute left-0 right-0 h-1 bg-nexus-blue/20 blur-sm pointer-events-none z-0" 
-                  />
-
-                  {/* Grid Cells */}
-                  <div className="absolute inset-4 grid grid-cols-8 grid-rows-6 gap-2">
-                    {board.map((row, y) => row.map((_, x) => {
-                      const isNexus = (x === 0 && (y === 2 || y === 3)) || (x === 7 && (y === 2 || y === 3));
-                      const isP1Nexus = x === 0 && (y === 2 || y === 3);
-                      return (
-                        <div 
-                          key={`cell-${x}-${y}`} 
-                          onClick={() => handleCellClick(x, y)}
-                          className={`w-20 h-20 relative rounded-xl border transition-all duration-300 group cursor-pointer ${
-                            isNexus 
-                              ? isP1Nexus 
-                                ? 'bg-blue-500/20 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]' 
-                                : 'bg-red-500/20 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
-                              : 'bg-white/5 border-white/5 hover:bg-white/10'
-                          } ${selectedCell?.x === x && selectedCell?.y === y ? 'ring-2 ring-blue-400 bg-blue-500/20 z-20 neon-glow-blue' : ''}`}
-                        >
-                          {isNexus && (
-                            <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-                              <Zap size={32} className={isP1Nexus ? 'text-blue-400 animate-pulse' : 'text-red-400 animate-pulse'} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }))}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[8px] font-black uppercase tracking-[0.3em] text-neutral-500 mb-1">Neural Connection</div>
+                    <div className="text-2xl font-serif italic text-white leading-none">Turn {currentTurn}/{MAX_TURNS}</div>
                   </div>
 
-                  {/* Units Layer */}
-                  <div className="absolute inset-4 pointer-events-none">
-                    <AnimatePresence>
-                      {board.flat().filter(Boolean).map((cell: any) => (
-                        <motion.div
-                          key={cell.id}
-                          layout
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ 
-                            scale: 1, 
-                            opacity: 1,
-                            x: cell.x * 88, 
-                            y: cell.y * 88,
-                            zIndex: cell.isAttacking ? 50 : 10,
-                            rotate: cell.isAttacking ? (cell.team === 'PLAYER' ? 15 : -15) : 0,
-                            scaleX: cell.isAttacking ? 1.2 : 1,
-                            scaleY: cell.isAttacking ? 1.2 : 1,
-                          }}
-                          exit={{ scale: 0, opacity: 0 }}
-                          transition={{ 
-                            type: 'spring', 
-                            stiffness: 250, 
-                            damping: 25,
-                            layout: { duration: 0.3 }
-                          }}
-                          className={`absolute w-20 h-20 p-1 pointer-events-none ${cell.lastHit && Date.now() - cell.lastHit < 500 ? 'damage-shiver' : ''}`}
-                        >
-                          <div className={`relative w-full h-full rounded-xl overflow-hidden shadow-xl transition-all ${
-                            cell.team === 'PLAYER' 
-                              ? `${BORDER_DATA.find(b => b.id === cell.borderId)?.style || 'border-2 border-blue-500 neon-glow-blue'} ${BACKGROUND_DATA.find(bg => bg.id === cell.backgroundId)?.style || 'bg-neutral-900'}`
-                              : 'border-2 border-red-500 bg-neutral-900 neon-glow-red'
-                          }`}>
-                            {cell.lastHit && Date.now() - cell.lastHit < 500 && (
-                              <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0 }} className="absolute inset-0 bg-white/40 z-20" />
-                            )}
-                            <img src={cell.image} className="w-full h-full object-cover brightness-75" referrerPolicy="no-referrer" />
-                            
-                            {cell.ability && (
-                              <div className="absolute top-2.5 right-1 px-1 py-0.5 rounded bg-black/80 border border-nexus-blue/30 text-nexus-blue text-[5px] font-black uppercase">
-                                {cell.ability.name}
+                  <div className="flex items-center gap-4 text-right">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 hidden sm:block">Simulation: Sector {currentTurn}</div>
+                    <div className="w-10 h-10 rounded-full border-2 border-red-500/50 flex items-center justify-center">
+                      <Cpu className="text-red-500 animate-pulse" size={20} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Locations Grid */}
+                <div className="flex-1 p-4 sm:p-12 flex items-center justify-center gap-4 sm:gap-8 overflow-hidden">
+                  {/* Win Streak Indicator */}
+                  {profile?.winStreak ? profile.winStreak >= 3 && (
+                    <motion.div 
+                      initial={{ scale: 0, x: -50 }}
+                      animate={{ scale: 1, x: 0 }}
+                      className="absolute left-8 top-1/2 -translate-y-1/2 z-[100] flex flex-col items-center"
+                    >
+                      <div className="relative">
+                        <Flame className="text-orange-500 w-12 h-12 animate-bounce" />
+                        <motion.div 
+                          animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="absolute inset-0 bg-orange-500 rounded-full blur-xl -z-10"
+                        />
+                      </div>
+                      <div className="text-[10px] font-black uppercase text-orange-500 tracking-tighter mt-2">Win Streak</div>
+                      <div className="text-4xl font-serif italic text-white drop-shadow-[0_0_10px_#f97316]">{profile.winStreak}</div>
+                      <div className="text-[8px] font-bold text-orange-600/50 uppercase mt-1">+50% Reward</div>
+                    </motion.div>
+                  ) : null}
+
+                  {locations.map((loc, i) => (
+                    <motion.div 
+                      key={loc.id}
+                      ref={el => locationRefs.current[i] = el}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="flex-1 max-w-[320px] h-full flex flex-col gap-4 relative group"
+                    >
+                      {/* Enemy Side Units */}
+                      <div className="flex-1 bg-red-500/5 border border-red-500/10 rounded-2xl p-4 grid grid-cols-2 grid-rows-2 gap-2 relative overflow-hidden">
+                        <div className="absolute inset-0 halftone-overlay opacity-5 pointer-events-none" />
+                        {loc.enemyUnits.map(unit => (
+                          <motion.div 
+                            key={unit.id} layout initial={{ scale: 0 }} animate={{ scale: 1 }}
+                            className="bg-neutral-900 border border-red-500/30 rounded-xl relative overflow-hidden h-full"
+                          >
+                            {unit.isRevealed ? (
+                              <>
+                                <img src={unit.image || ""} className="w-full h-full object-cover grayscale brightness-50" referrerPolicy="no-referrer" />
+                                <div className="absolute bottom-1 right-1 bg-red-500 text-white text-[10px] font-black px-1.5 rounded">{unit.power}</div>
+                                {unit.effect && <div className="absolute top-1 left-1 p-0.5 bg-black/60 rounded text-[6px] text-white uppercase">{unit.effect.type}</div>}
+                              </>
+                            ) : (
+                              <div className="w-full h-full bg-red-950/40 flex items-center justify-center">
+                                <ShieldQuestion size={24} className="text-red-500/50 animate-pulse" />
                               </div>
                             )}
-                            
-                            {/* Health Bar */}
-                            <div className="absolute top-1 inset-x-1 h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
-                              <motion.div 
-                                initial={{ width: '100%' }}
-                                animate={{ width: `${(cell.hp / cell.maxHp) * 100}%` }}
-                                className={`h-full ${cell.team === 'PLAYER' ? 'bg-blue-500' : 'bg-red-500'}`}
-                              />
-                            </div>
-
-                            <div className="absolute inset-x-0 bottom-0 p-1 bg-black/60 flex justify-between items-center text-[8px] font-black">
-                              <span className="text-white/50">{getArchetypeIcon(cell.type)}</span>
-                              <span className={cell.lastHit && Date.now() - cell.lastHit < 500 ? 'text-red-500 scale-125 transition-transform' : ''}>{cell.hp}</span>
-                            </div>
-
-                            {/* Damage Numbers */}
-                            <AnimatePresence>
-                              {cell.lastHit && Date.now() - cell.lastHit < 800 && (
-                                <motion.div
-                                  initial={{ y: 0, opacity: 1, scale: 1 }}
-                                  animate={{ y: -40, opacity: 0, scale: 1.5 }}
-                                  className="absolute inset-0 flex items-center justify-center text-red-500 font-black text-xl italic pointer-events-none z-50 drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]"
-                                >
-                                  HIT
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-
-            <div className="hidden lg:flex w-64 bg-black/40 border-l border-white/10 p-6 flex-col gap-6 backdrop-blur-xl">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-500">Battle Intelligence</div>
-              <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar">
-                {log.map((msg, i) => (
-                  <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} key={i} className="text-[11px] text-zinc-400 pl-3 border-l border-white/10 leading-relaxed">{msg}</motion.div>
-                ))}
-              </div>
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-center">
-                 <Trophy className="mx-auto text-blue-500 mb-2" size={20} />
-                 <div className="text-[10px] font-black uppercase text-neutral-500">Sector Control</div>
-                 <div className="text-xl font-serif italic">Dominant</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-44 sm:h-52 lg:h-64 glass-card border-t border-white/10 p-4 lg:p-8 flex flex-col lg:flex-row gap-6 relative z-50">
-            <div className="flex items-center justify-between lg:flex-col lg:justify-center lg:items-start lg:w-48 border-r border-white/5 pr-6">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Energy</div>
-                <div className="flex items-center gap-2 text-2xl font-black text-blue-400">
-                  <Zap size={20} className="fill-current" />
-                  <span>{playerMana}</span>
-                </div>
-              </div>
-              <motion.button 
-                whileTap={{ scale: 0.95 }}
-                onClick={endTurn}
-                disabled={turn !== 'PLAYER'}
-                className="px-4 py-2 sm:px-6 sm:py-3 lg:w-full bg-white text-black rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-500 hover:text-white disabled:bg-neutral-800 transition-all flex items-center justify-center gap-2"
-              >
-                <span>Sync</span>
-                <RefreshCw size={14} className={turn === 'ENEMY' ? 'animate-spin' : ''} />
-              </motion.button>
-            </div>
-
-            <div className="flex-1 flex gap-4 overflow-x-auto overflow-y-hidden pb-2 custom-scrollbar relative">
-              <div className="flex-shrink-0 w-24 h-full border-2 border-white/5 bg-neutral-900 rounded-2xl flex flex-col items-center justify-center gap-2 opacity-50">
-                 <Package size={32} />
-                 <div className="text-[8px] font-black uppercase tracking-widest text-neutral-500">Archives</div>
-              </div>
-              <AnimatePresence>
-                {hand.map((card, idx) => (
-                  <motion.div
-                    layout
-                    key={`${card.id}-${idx}`}
-                    initial={{ x: -100, opacity: 0, scale: 0.5, rotate: -20 }}
-                    animate={{ x: 0, opacity: 1, scale: 1, rotate: 0 }}
-                    whileHover={{ y: -10, scale: 1.05 }}
-                    onClick={() => setSelectedCardDetail(card)}
-                    className={`flex-shrink-0 w-28 sm:w-32 lg:w-40 relative group h-full rounded-2xl overflow-hidden border cursor-pointer transition-all ${playerMana >= card.cost ? (BORDER_DATA.find(b => b.id === ownedCards.find(oc => oc.cardId === card.id)?.borderId)?.style || 'border-white/20 hover:border-blue-400') : 'opacity-40 grayscale cursor-not-allowed border-white/5'}`}
-                  >
-                    <img src={SKIN_DATA.find(s => s.id === ownedCards.find(oc => oc.cardId === card.id)?.activeSkinId)?.image || card.image} className="absolute inset-0 w-full h-full object-cover brightness-50 group-hover:brightness-75" referrerPolicy="no-referrer" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
-                    <div className="relative h-full p-2 sm:p-3 flex flex-col justify-between">
-                      <div className="flex justify-between">
-                        <div className="p-1 bg-black/50 rounded-lg border border-white/10">{getArchetypeIcon(card.type)}</div>
-                        <div className="bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-md font-black">{card.cost}</div>
+                          </motion.div>
+                        ))}
                       </div>
-                      <div className="text-[10px] font-black truncate">{card.name}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        </div>
-      )}
+
+                      {/* Location Center Hub */}
+                      <div className={`h-40 rounded-[2.5rem] border-4 border-black relative overflow-hidden transition-all duration-500 ${loc.isRevealed ? 'bg-neutral-900 shadow-[8px_8px_0_#000]' : 'bg-neutral-950 scale-95 opacity-50'}`}>
+                        {loc.isRevealed ? (
+                          <>
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10" />
+                            <div className="absolute inset-x-0 top-0 h-10 flex items-center justify-between px-6 bg-black/40 border-b border-white/5">
+                               <div className="text-red-500 font-black text-xl italic leading-none">{loc.enemyPower}</div>
+                               <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">{loc.name}</div>
+                               <div className="text-blue-500 font-black text-xl italic leading-none">{loc.playerPower}</div>
+                            </div>
+                            <div className="p-6 pt-12 text-center h-full">
+                              <p className="text-[9px] text-zinc-400 font-medium leading-tight line-clamp-3 italic">"{loc.description}"</p>
+                            </div>
+                            <div className="absolute bottom-0 inset-x-0 h-1 bg-white/5">
+                              <div className="h-full bg-nexus-blue shadow-[0_0_10px_#00f2ff] transition-all duration-500" style={{ width: loc.playerPower > loc.enemyPower ? '100% ' : loc.playerPower < loc.enemyPower ? '0%' : '50%' }} />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-full gap-2">
+                             <div className="text-2xl font-black text-zinc-800 italic uppercase">Node Hidden</div>
+                             <div className="text-[8px] text-zinc-800 uppercase tracking-widest font-black">Reveals on Turn {loc.revealTurn}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Player Side Units */}
+                      <div className="flex-1 bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 grid grid-cols-2 grid-rows-2 gap-2 relative overflow-hidden">
+                        <div className="absolute inset-0 halftone-overlay opacity-5 pointer-events-none" />
+                        {loc.playerUnits.map(unit => (
+                          <motion.div 
+                            key={unit.id} layout initial={{ scale: 0 }} animate={{ scale: 1 }}
+                            className="bg-neutral-900 border border-blue-500/30 rounded-xl relative overflow-hidden cursor-help group/unit h-full"
+                          >
+                             {unit.isRevealed ? (
+                              <>
+                                <img src={unit.image || ""} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <div className="absolute bottom-1 right-1 bg-blue-600 text-white text-[10px] font-black px-1.5 rounded shadow-lg">{unit.power}</div>
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/unit:opacity-100 transition-opacity flex items-center justify-center p-2 text-center pointer-events-none">
+                                   <div className="text-[8px] font-black text-white">{unit.name}</div>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="w-full h-full bg-blue-950/40 flex items-center justify-center">
+                                <Cpu size={24} className="text-blue-500/50 animate-pulse" />
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Hand / Action Area */}
+                <div className="h-48 border-t border-white/10 bg-black/60 backdrop-blur-2xl p-6 flex gap-8 items-center z-50">
+                   <div className="flex flex-col items-center justify-center w-32 border-r border-white/5 pr-8">
+                     <div className="text-[10px] font-black uppercase text-neutral-500 mb-2 tracking-widest">Neural Energy</div>
+                     <div className="flex items-center gap-2 text-3xl font-black text-blue-400">
+                        <Zap size={24} className="fill-current" />
+                        <span>{playerMana}</span>
+                     </div>
+                   </div>
+
+                   <div className="flex-1 flex gap-4 overflow-x-auto overflow-y-hidden py-2 custom-scrollbar pr-4">
+                     {hand.map((card, idx) => (
+                       <motion.div
+                         key={`${card.id}-${idx}`}
+                         drag
+                         dragSnapToOrigin
+                         dragElastic={0.1}
+                         whileHover={{ y: -20, scale: 1.1, zIndex: 100 }}
+                         whileDrag={{ scale: 0.8, rotate: 0, zIndex: 500 }}
+                         onDragEnd={(_, info) => {
+                           checkDropLocation(info.point.x, info.point.y, card);
+                         }}
+                         onClick={() => setSelectedCardDetail(card)}
+                         className={`flex-shrink-0 w-28 aspect-[3/4] rounded-2xl overflow-hidden border-2 cursor-grab active:cursor-grabbing transition-all shadow-xl relative group ${playerMana >= card.cost ? 'border-nexus-blue shadow-[0_0_15px_rgba(0,242,255,0.2)]' : 'border-white/5 opacity-40 grayscale pointer-events-none'}`}
+                       >
+                          <img src={card.image || ""} className="absolute inset-0 w-full h-full object-cover brightness-50" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black flex items-center justify-between">
+                             <div className="text-[9px] font-black truncate text-white">{card.name}</div>
+                             <div className="text-blue-400 font-bold text-[10px]">{card.cost}</div>
+                          </div>
+                   <div className="absolute top-1 left-1 p-1 bg-black/60 rounded text-nexus-blue group-hover:scale-110 transition-transform">
+                             {getArchetypeIcon(card.type)}
+                          </div>
+                       </motion.div>
+                     ))}
+                   </div>
+
+                   <div className="w-48 pl-8 border-l border-white/5">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        disabled={turn !== 'PLAYER' || gameOver !== null}
+                        onClick={endTurn}
+                        className="w-full h-full bg-white text-black rounded-3xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-nexus-blue hover:text-white transition-all disabled:opacity-30 disabled:grayscale"
+                      >
+                         {turn === 'PLAYER' ? 'Sync Neural Path' : 'Synching...'}
+                      </motion.button>
+                   </div>
+                </div>
+
+                <AnimatePresence>
+                  {showTurnOverlay && (
+                    <motion.div 
+                      key={currentTurn}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 1.5, opacity: 0 }}
+                      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[200] pointer-events-none"
+                    >
+                      <h1 className="text-9xl font-serif italic text-white drop-shadow-[0_0_50px_rgba(255,255,255,0.5)]">
+                        Turn {currentTurn}
+                      </h1>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
           </div>
         </div>
       )}
@@ -2709,127 +3063,90 @@ export default function App() {
         {selectedCardDetail && (
           <CardDetailModal 
             card={selectedCardDetail} 
+            locations={view === 'BATTLE' ? locations : undefined}
             onClose={() => setSelectedCardDetail(null)} 
-            onPlay={view === 'BATTLE' && turn === 'PLAYER' && playerMana >= selectedCardDetail.cost ? () => {
-              const card = selectedCardDetail;
-              if (card.type === 'HORDE') {
-                let s = 0; for(let y=0; y<BOARD_HEIGHT && s < 2; y++) if(spawnUnit(card, 0, y, 'PLAYER')) s++;
-                if(s > 0) { 
-                  setPlayerMana(p => p - card.cost); 
-                  setHand(h => {
-                    const idx = h.findIndex(hc => hc.id === card.id);
-                    if (idx !== -1) return h.filter((_, i) => i !== idx);
-                    return h;
-                  });
-                }
-              } else {
-                for(let y=0; y<BOARD_HEIGHT; y++) if(spawnUnit(card, 0, y, 'PLAYER')) { 
-                  setPlayerMana(p => p - card.cost); 
-                  setHand(h => {
-                    const idx = h.findIndex(hc => hc.id === card.id);
-                    if (idx !== -1) return h.filter((_, i) => i !== idx);
-                    return h;
-                  });
-                  break; 
-                }
-              }
+            onPlay={view === 'BATTLE' && turn === 'PLAYER' ? (locIdx) => {
+              playCard(selectedCardDetail, locIdx, 'PLAYER');
             } : undefined}
           />
         )}
       </AnimatePresence>
 
       {/* Game Over */}
+      {/* Game Over */}
       <AnimatePresence>
         {gameOver && (
           <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-3xl overflow-hidden"
+            className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-2xl flex flex-col items-center justify-center p-8 overflow-hidden"
           >
-            {/* Background Kinetic Pulse */}
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.2, 1],
-                opacity: [0.1, 0.3, 0.1]
-              }}
-              transition={{ duration: 4, repeat: Infinity }}
-              className={`absolute inset-0 blur-[150px] ${gameOver === 'PLAYER' ? 'bg-blue-500' : 'bg-red-600'}`}
-            />
+             <div className="absolute inset-0 halftone-overlay opacity-20 pointer-events-none" />
+             
+             {/* Power Rays */}
+             <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className={`absolute inset-0 blur-[150px] opacity-30 ${gameOver === 'PLAYER' ? 'bg-blue-500' : 'bg-red-600'}`}
+             />
 
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0, y: 40 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ type: "spring", damping: 20, stiffness: 100 }}
-              className="relative glass-card p-8 sm:p-16 rounded-[4rem] text-center max-w-xl mx-6 border-white/5 shadow-[0_0_150px_rgba(0,0,0,1)] z-10"
-            >
-              {/* Top Label */}
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-[10px] font-black uppercase tracking-[0.5em] text-neutral-500 mb-6"
-              >
-                Simulation Concluded
-              </motion.div>
-
-              {/* Main Title with Glitch Effect */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="relative"
-              >
-                <div className={`text-5xl sm:text-7xl font-serif italic mb-8 leading-none tracking-tighter ${gameOver === 'PLAYER' ? 'text-blue-400' : 'text-red-500'}`}>
-                  {gameOver === 'PLAYER' ? 'NEXUS WON' : 'LINK FAILED'}
+             <motion.div 
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              className="relative z-10 flex flex-col items-center text-center max-w-2xl w-full"
+             >
+                <div className="mb-6">
+                   {gameOver === 'PLAYER' ? (
+                     <Trophy className="text-blue-400 w-24 h-24 drop-shadow-[0_0_30px_rgba(59,130,246,0.5)]" />
+                   ) : (
+                     <ShieldAlert className="text-red-500 w-24 h-24 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]" />
+                   )}
                 </div>
-                {/* Visual aberration shadow */}
-                <motion.div 
-                  animate={{ x: [-2, 2, -2], opacity: [0, 0.5, 0] }}
-                  transition={{ duration: 0.1, repeat: Infinity, repeatType: "mirror" }}
-                  className={`absolute inset-0 text-5xl sm:text-7xl font-serif italic leading-none tracking-tighter -z-10 blur-sm ${gameOver === 'PLAYER' ? 'text-cyan-400' : 'text-orange-600'}`}
+
+                <h2 className={`text-6xl sm:text-7xl font-serif italic mb-2 leading-none tracking-tighter ${gameOver === 'PLAYER' ? 'text-blue-400' : 'text-red-500'}`}>
+                  {gameOver === 'PLAYER' ? 'NEURAL VICTORY' : gameOver === 'TIE' ? 'STALEMATE' : 'SYSTEM CRASH'}
+                </h2>
+                
+                <p className="text-zinc-500 font-black uppercase tracking-[0.4em] text-[10px] mb-12">
+                   {gameOver === 'PLAYER' ? 'Sector secured. Sync levels elevated.' : 'Connection lost. Neural patterns disrupted.'}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full mb-16">
+                  {locations.map(loc => (
+                    <div key={loc.id} className="bg-black/40 border border-white/5 rounded-3xl p-4 backdrop-blur-sm shadow-xl">
+                       <div className="text-[9px] font-black uppercase text-neutral-600 mb-2">{loc.name}</div>
+                       <div className="flex items-center justify-center gap-3">
+                          <span className={`text-2xl font-black italic ${loc.playerPower > loc.enemyPower ? 'text-blue-400' : 'text-zinc-700'}`}>{loc.playerPower}</span>
+                          <span className="text-[10px] font-black text-zinc-800">VS</span>
+                          <span className={`text-2xl font-black italic ${loc.enemyPower > loc.playerPower ? 'text-red-500' : 'text-zinc-700'}`}>{loc.enemyPower}</span>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+
+                {profile?.winStreak ? profile.winStreak >= 3 && (
+                   <div className="mb-8 p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center gap-4">
+                      <Flame className="text-orange-500" size={32} />
+                      <div className="text-left">
+                         <div className="text-[10px] font-black text-orange-500 uppercase">Streak Maintained</div>
+                         <div className="text-sm font-medium text-zinc-400">Your {profile.winStreak} match win streak continues!</div>
+                      </div>
+                   </div>
+                ) : null}
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setView('MENU');
+                    setGameOver(null);
+                  }}
+                  className="px-12 py-5 bg-white text-black rounded-full font-black uppercase text-sm tracking-[0.2em] shadow-[0_0_50px_rgba(255,255,255,0.2)] hover:bg-nexus-blue hover:text-white transition-all"
                 >
-                  {gameOver === 'PLAYER' ? 'NEXUS WON' : 'LINK FAILED'}
-                </motion.div>
-              </motion.div>
-
-              <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="text-zinc-500 text-sm sm:text-base mb-12 leading-relaxed font-medium px-4"
-              >
-                {gameOver === 'PLAYER' 
-                  ? 'Absolute dominance achieved. Sector 7B has been successfully archived and repurposed.' 
-                  : 'Critical tactical failure. Nexus link compromised. Tactical grid collapsing in 3... 2...'}
-              </motion.p>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-              >
-                <button 
-                  onClick={() => { setGameOver(null); setView('MENU'); setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))); }}
-                  className="group relative w-full py-5 rounded-3xl bg-white text-black font-black uppercase text-[10px] tracking-[0.3em] overflow-hidden transition-all hover:bg-nexus-blue hover:text-white"
-                >
-                  <span className="relative z-10">Return to Nexus Command</span>
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-500"
-                  />
-                </button>
-              </motion.div>
-
-              {/* Status Code */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.3 }}
-                transition={{ delay: 1 }}
-                className="mt-8 font-mono text-[8px] text-neutral-500 uppercase tracking-widest"
-              >
-                Ref: {Math.random().toString(36).substring(7).toUpperCase()} // Latency 12ms // Core: Active
-              </motion.div>
-            </motion.div>
+                   Return to Central Command
+                </motion.button>
+             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

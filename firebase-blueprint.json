@@ -25,9 +25,23 @@
         "claimedRewards": { "type": "array" },
         "avatarUrl": { "type": "string" },
         "ownedIcons": { "type": "array" },
-        "storeIcons": { "type": "array" }
+        "storeIcons": { "type": "array" },
+        "activeDeckId": { "type": "string" }
       },
       "required": ["uid", "displayName", "credits", "gold", "materials", "arenaScrolls", "level", "xp", "rank", "points", "battlePassLevel", "battlePassXp", "claimedRewards"]
+    },
+    "Deck": {
+      "title": "Player Deck",
+      "description": "Collection of cards chosen for battle",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cardIds": { "type": "array" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "cardIds", "ownerId", "createdAt"]
     },
     "OwnedCard": {
       "title": "Owned Card",
@@ -80,6 +94,10 @@
     "/users/{userId}/cards/{cardId}": {
       "schema": "OwnedCard",
       "description": "Collection of cards owned by the user"
+    },
+    "/users/{userId}/decks/{deckId}": {
+      "schema": "Deck",
+      "description": "Collection of decks created by the user"
     },
     "/guilds/{guildId}": {
       "schema": "Guild",
